@@ -1,30 +1,18 @@
-"use client";
+// "use client";
+// // Adjust this import to match the actual export from your trpc/client module.
+// // For example, if it exports 'trpc' or 'api', import that instead:
+// import { useTRPC } from "@/trpc/client";
+// import { useSuspenseQuery } from "@tanstack/react-query";
+// import {useEffect, useState} from "react";
 
-import { FC } from "react";
-import { Button } from "@/components/ui/button";
-import { trpc } from "@/trpc/client";
-
-interface ClientProps {
-  serverData: string;
-}
-
-const ClientComponent: FC<ClientProps> = ({ serverData }) => {
-  const query = trpc.createAI.useQuery({ text: "123 " });
-
-  return (
-    <div className="flex justify-center items-center flex-col h-[100vh] mt-5 font-bold">
-      Hello, NEXTJS
-      <Button variant="destructive" className="mt-2">Click Me</Button>
-
-      <div className="mt-4">
-        <div>Server Data: {serverData}</div>
-
-        {query.isLoading && "Loading..."}
-        {query.error && `Error: ${query.error.message}`}
-        {query.data && `Response: ${query.data}`}
-      </div>
-    </div>
-  );
-};
-
-export default ClientComponent;
+// export const Client = ()
+// =>{
+// const trpc = useTRPC();
+// const {data} = useSuspenseQuery(trpc.createAI.queryOptions({ text: "Antonio PREFETCH" }));
+// useEffect(() => {})
+// const [] useState();
+// return (
+// <div>
+// {JSON.stringify(data)}
+// </div>
+// );}
