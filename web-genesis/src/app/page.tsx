@@ -1,14 +1,14 @@
-import { Button } from "@/components/ui/button";
+import { getQueryClient, trpc} from "@/trpc/server";
+import { dehydrate, HydrationBoundary } from "@tanstack/react-query";
+// import ClientComponent from "./client";
 
-const Page = async () => {
-  return (
-    <div className=" flex justify-center items-center flex-col h-[100vh] mt-5 font-bold">
-      Hello, NEXTJS
-      <Button variant="destructive" className="mt-2">
-        Click Me
-      </Button>
+  return (<HydrationBoundary state={dehydrate(queryClient)}>
+    <div>
+      
+    {/* <{JSON.stringify(dehydrate(queryClient))}>  
+     */}
     </div>
-  );
-};
-
-export default Page;
+    </HydrationBoundary>
+  )
+}
+ 
