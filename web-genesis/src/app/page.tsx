@@ -16,8 +16,8 @@ const Page = () => {
   });
 
   return (
-    <div className="p-4 max-w-2xl mx-auto">
-    <input value={value} onChange={(e) => setValue(e.target.value)} />
+    <div className="p-4 max-w-7xl mx-auto">
+    <input className="p-5 border border-b" value={value} onChange={(e) => setValue(e.target.value)} />
       <button
         disabled={invoke.isPending}
         onClick={() => invoke.mutate({ value: value })}
