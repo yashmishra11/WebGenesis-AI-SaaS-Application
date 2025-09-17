@@ -1,0 +1,17 @@
+# This is a config for E2B sandbox template.
+# You can use template ID (rlecafwpjpj0ihrfjk1p) or template name (webgenesis-test) to create a sandbox:
+
+# Python SDK
+# from e2b import Sandbox, AsyncSandbox
+# sandbox = Sandbox("webgenesis-test") # Sync sandbox
+# sandbox = await AsyncSandbox.create("webgenesis-test") # Async sandbox
+
+# JS SDK
+# import { Sandbox } from 'e2b'
+# const sandbox = await Sandbox.create('webgenesis-test')
+
+team_id = "be28bd10-2dd3-46e7-ab16-46533bfcf0cb"
+start_cmd = "/compile_page.sh"
+dockerfile = "e2b.Dockerfile"
+template_name = "webgenesis-test"
+template_id = "rlecafwpjpj0ihrfjk1p"
