@@ -29,7 +29,6 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-screen bg-gray-50`}
       >
-        {/* ✅ TRPC Provider wrapped here so queries work in the entire app */}
         <TRPCReactProvider>
           <Toaster />
           {children}
