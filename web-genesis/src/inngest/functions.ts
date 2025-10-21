@@ -3,6 +3,7 @@ import { inngest } from "./client";
 import { Sandbox } from "@e2b/code-interpreter";
 import { getSandBox } from "./utils";
 import { Ollama } from "ollama";
+import { PROMPT } from "./prompt";
 
 const ollama = new Ollama({
   host: "http://127.0.0.1:11434",
@@ -33,7 +34,7 @@ function extractJSONBlock(text: string): any | null {
 
 // ---------- Tools (use getSandBox(sandboxId) to access sandbox instance) ----------
 async function runTerminal(command: string, sandboxId: string) {
-const sandbox = await Sandbox.create('web-test')
+  const sandbox = await getSandBox(sandboxId);
   const buffers = { stdout: "", stderr: "" };
 
   const res = await sandbox.commands.run(command, {
@@ -75,34 +76,15 @@ export const helloWorld = inngest.createFunction(
 
     // 1) Create sandbox and keep sandboxId only
     const sandboxId = await step.run("create-sandbox", async () => {
-      // Debug logging
-      console.log('=== E2B API KEY DEBUG ===');
-      console.log('E2B_API_KEY exists:', !!process.env.E2B_API_KEY);
-      console.log('E2B_API_KEY length:', process.env.E2B_API_KEY?.length);
-      console.log('E2B_API_KEY starts with:', process.env.E2B_API_KEY?.substring(0, 10));
-      console.log('All env vars:', Object.keys(process.env).filter(k => k.includes('E2B')));
-      
-      // Use env variable or fallback to hardcoded (temporary)
-      const apiKey = process.env.E2B_API_KEY || "e2b_ee5b23ab96c80237d05ec9fea3bf83383273f5aa";
-      
-      console.log('Using API key:', apiKey.substring(0, 10) + '...');
-      
-      const s = await Sandbox.create("web-test", {
-        apiKey: apiKey
-      });
+      const s = await Sandbox.create("web-test");
       return s.sandboxId;
     });
 
-    // 2) Call Ollama with a system prompt that instructs JSON tool calls
-    const systemPrompt = `You are a coding assistant. When you want the host to execute a tool, RESPOND WITH A SINGLE JSON OBJECT ONLY (no extra text).
-Example JSON formats:
-{ "tool": "terminal", "args": { "command": "ls -la" } }
-{ "tool": "createOrUpdateFiles", "args": { "files": [{ "path": "index.ts", "content": "console.log('hi')" }] } }
-{ "tool": "readFiles", "args": { "files": ["index.ts"] } }
-
-If you don't need tools, return the code or explanation as plain text (no JSON).`;
-
+    // 2) Call Ollama with system prompt
+    const systemPrompt = PROMPT;
     const userPrompt = event?.data?.value ?? "";
+
+    console.log("Calling Ollama with user prompt:", userPrompt);
 
     const response = await ollama.chat({
       model: process.env.OLLAMA_MODEL || "qwen2.5-coder:3b",
@@ -110,10 +92,11 @@ If you don't need tools, return the code or explanation as plain text (no JSON).
         { role: "system", content: systemPrompt },
         { role: "user", content: userPrompt },
       ],
-      // stream: true, // optionally enable streaming to reduce header-timeout risk
     });
 
     const raw = response?.message?.content ?? "";
+    console.log("Raw LLM response:", raw);
+
     let parsed: any = null;
     let toolResult: any = null;
 
@@ -121,23 +104,28 @@ If you don't need tools, return the code or explanation as plain text (no JSON).
     parsed = extractJSONBlock(raw);
 
     if (parsed && parsed.tool) {
+      console.log("Parsed tool call:", JSON.stringify(parsed, null, 2));
+
       try {
         switch (parsed.tool) {
           case "terminal": {
             const cmd = parsed.args?.command;
             if (!cmd) throw new Error("Missing 'command' for terminal tool");
+            console.log("Running terminal command:", cmd);
             toolResult = await runTerminal(cmd, sandboxId);
             break;
           }
           case "createOrUpdateFiles": {
             const files = parsed.args?.files;
             if (!Array.isArray(files)) throw new Error("'files' must be an array");
+            console.log("Creating/updating files:", files.map(f => f.path));
             toolResult = await createOrUpdateFiles(files, sandboxId);
             break;
           }
           case "readFiles": {
             const files = parsed.args?.files;
             if (!Array.isArray(files)) throw new Error("'files' must be an array");
+            console.log("Reading files:", files);
             toolResult = await readFiles(files, sandboxId);
             break;
           }
@@ -145,25 +133,29 @@ If you don't need tools, return the code or explanation as plain text (no JSON).
             toolResult = { error: `Unknown tool: ${parsed.tool}` };
         }
       } catch (err: any) {
+        console.error("Tool execution error:", err);
         toolResult = { error: String(err) };
       }
     } else {
-      // No tool call: plain text/code response.
+      console.log("No tool call detected in response");
       toolResult = null;
     }
 
-    // 4) Build sandbox URL using your helper
+    // 4) Build sandbox URL
     const sandboxInstance = await getSandBox(sandboxId);
-    const host = await sandboxInstance.getHost(3000); // your util appears to use this
+    const host = await sandboxInstance.getHost(3000);
     const sandBoxUrl = `https://${host}`;
 
-    // 5) Return everything useful
+    console.log("Sandbox URL:", sandBoxUrl);
+
+    // 5) Return everything
     return {
-      raw, // original assistant output
-      parsed, // JSON object if present
-      toolResult, // execution result if a tool was called
+      raw,
+      parsed,
+      toolResult,
       sandboxId,
       sandBoxUrl,
     };
   }
 );
+
