@@ -139,7 +139,7 @@ export const helloWorld = inngest.createFunction(
 
     const response = await ollama.chat({
       // USE A BETTER MODEL - qwen2.5-coder is MUCH better for code generation
-      model: process.env.OLLAMA_MODEL || "qwen2.5-coder:1.5b",
+      model: process.env.OLLAMA_MODEL || "qwen2.5-coder:3b",
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: userPrompt },
