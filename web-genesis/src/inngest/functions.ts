@@ -4,6 +4,12 @@ import { Sandbox } from "@e2b/code-interpreter";
 import { getSandBox } from "./utils";
 import { Ollama } from "ollama";
 import { PROMPT } from "./prompt";
+// import { prisma } from "@/lib/db";
+
+// interface AgentState {
+//   summary: string;
+//   files: {path: string; string ;}
+// };
 
 const ollama = new Ollama({
   host: "http://127.0.0.1:11434",
@@ -119,9 +125,9 @@ async function readFiles(files: string[], sandboxId: string) {
 }
 
 // ---------- helloWorld Inngest function ----------
-export const helloWorld = inngest.createFunction(
-  { id: "hello-world" },
-  { event: "test/hello.world" },
+export const codeAgentFunction = inngest.createFunction(
+  { id: "code-agent" },
+  { event: "code-agent/run" },
   async (ctx) => {
     const { step, event } = ctx;
 
@@ -208,12 +214,42 @@ export const helloWorld = inngest.createFunction(
       }
     }
 
+    // const isError = 
+    // !Result.state.data.summary ||
+    // object.keys(Result.state.data.files || {}).length === 0;
+
     // 4) Build sandbox URL
     const sandboxInstance = await getSandBox(sandboxId);
     const host = await sandboxInstance.getHost(3000);
     const sandBoxUrl = `https://${host}`;
 
     console.log("Sandbox URL:", sandBoxUrl);
+
+    // await step.run("save-result", async () => {
+    //   if (isError) {
+    //     return await prisma.message.create({
+    //       data: {
+    //         content: "Somthing went wrong generating the code. Please try again.",
+    //         role: "ASSISTANT",
+    //         type: "ERROR",},
+    //     });
+    //   }  
+    //   return await prisma.message.create({
+    //     data: {
+    //       content: result.state.data.summary,
+    //       role: "ASSISTANT",
+    //       type: "RESULT",
+    //       fragment:{
+    //         create:{
+    //           sandboxUrl: sandBoxUrl,
+    //           title: "Fragment",
+    //           files: result.state.data.files,
+
+    //         }
+    //       }
+    //     },
+    //     })
+    // });
 
     // 5) Return everything
     return {
