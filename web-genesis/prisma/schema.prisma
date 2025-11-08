@@ -6,7 +6,6 @@
 
 generator client {
   provider = "prisma-client-js"
-  output   = "../src/generated/prisma"
 }
 
 datasource db {
@@ -23,26 +22,27 @@ enum MessageType {
   RESULT
   ERROR
 }
-model Message{
-  id String @id @default(uuid())
-  content String
-  role MessageRole
-  type MessageType
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+
+model Message {
+  id        String      @id @default(uuid())
+  content   String
+  role      MessageRole
+  type      MessageType
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
 
   fragment Fragment?
 }
+
 model Fragment {
-  id String @id @default(uuid())
-  messageId String @unique
-  message Message @relation(fields: [messageId], references:[id], onDelete: Cascade)
+  id        String  @id @default(uuid())
+  messageId String  @unique
+  message   Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
 
- sandboxUrl String
- title String
- files Json  
+  sandboxUrl String
+  title      String
+  files      Json
 
- createdAt DateTime @default(now())
+  createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-
 }
