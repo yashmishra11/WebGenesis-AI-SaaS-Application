@@ -4,12 +4,12 @@ import { Sandbox } from "@e2b/code-interpreter";
 import { getSandBox } from "./utils";
 import { Ollama } from "ollama";
 import { PROMPT } from "./prompt";
-// import { prisma } from "@/lib/db";
+import prisma from "@/lib/db";
 
-// interface AgentState {
-//   summary: string;
-//   files: {path: string; string ;}
-// };
+interface AgentState {
+  summary: string;
+  files: { [path: string]: string };
+}
 
 const ollama = new Ollama({
   host: "http://127.0.0.1:11434",
@@ -82,10 +82,10 @@ export default function Home() {
       </div>
     </div>
   );
-}`
-        }
-      ]
-    }
+}`,
+        },
+      ],
+    },
   };
 }
 
@@ -95,8 +95,12 @@ async function runTerminal(command: string, sandboxId: string) {
   const buffers = { stdout: "", stderr: "" };
 
   const res = await sandbox.commands.run(command, {
-    onStdout: (d: string) => { buffers.stdout += d; },
-    onStderr: (d: string) => { buffers.stderr += d; },
+    onStdout: (d: string) => {
+      buffers.stdout += d;
+    },
+    onStderr: (d: string) => {
+      buffers.stderr += d;
+    },
   });
 
   return {
@@ -106,7 +110,10 @@ async function runTerminal(command: string, sandboxId: string) {
   };
 }
 
-async function createOrUpdateFiles(files: { path: string; content: string }[], sandboxId: string) {
+async function createOrUpdateFiles(
+  files: { path: string; content: string }[],
+  sandboxId: string
+) {
   const sandbox = await getSandBox(sandboxId);
   for (const file of files) {
     await sandbox.files.write(file.path, file.content);
@@ -145,7 +152,7 @@ export const codeAgentFunction = inngest.createFunction(
 
     const response = await ollama.chat({
       // USE A BETTER MODEL - qwen2.5-coder is MUCH better for code generation
-      model: process.env.OLLAMA_MODEL || "qwen2.5-coder:3b",
+      model: process.env.OLLAMA_MODEL || "qwen2:1.5b",
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: userPrompt },
@@ -153,7 +160,7 @@ export const codeAgentFunction = inngest.createFunction(
       options: {
         temperature: 0.7,
         num_predict: 2000, // Allow longer responses
-      }
+      },
     });
 
     const raw = response?.message?.content ?? "";
@@ -167,7 +174,9 @@ export const codeAgentFunction = inngest.createFunction(
 
     // NEW: If parsing failed, use fallback
     if (!parsed || !parsed.tool) {
-      console.log("⚠️ No valid tool call detected, using fallback page generator");
+      console.log(
+        "⚠️ No valid tool call detected, using fallback page generator"
+      );
       parsed = createFallbackPage(userPrompt);
     }
 
@@ -185,14 +194,19 @@ export const codeAgentFunction = inngest.createFunction(
           }
           case "createOrUpdateFiles": {
             const files = parsed.args?.files;
-            if (!Array.isArray(files)) throw new Error("'files' must be an array");
-            console.log("Creating/updating files:", files.map((f: any) => f.path));
+            if (!Array.isArray(files))
+              throw new Error("'files' must be an array");
+            console.log(
+              "Creating/updating files:",
+              files.map((f: any) => f.path)
+            );
             toolResult = await createOrUpdateFiles(files, sandboxId);
             break;
           }
           case "readFiles": {
             const files = parsed.args?.files;
-            if (!Array.isArray(files)) throw new Error("'files' must be an array");
+            if (!Array.isArray(files))
+              throw new Error("'files' must be an array");
             console.log("Reading files:", files);
             toolResult = await readFiles(files, sandboxId);
             break;
@@ -200,23 +214,25 @@ export const codeAgentFunction = inngest.createFunction(
           default:
             console.log("Unknown tool, using fallback");
             const fallback = createFallbackPage(userPrompt);
-            toolResult = await createOrUpdateFiles(fallback.args.files, sandboxId);
+            toolResult = await createOrUpdateFiles(
+              fallback.args.files,
+              sandboxId
+            );
         }
       } catch (err: any) {
         console.error("Tool execution error:", err);
         // On error, still try to create a fallback page
         try {
           const fallback = createFallbackPage(userPrompt);
-          toolResult = await createOrUpdateFiles(fallback.args.files, sandboxId);
+          toolResult = await createOrUpdateFiles(
+            fallback.args.files,
+            sandboxId
+          );
         } catch (fallbackErr) {
           toolResult = { error: String(err) };
         }
       }
     }
-
-    // const isError = 
-    // !Result.state.data.summary ||
-    // object.keys(Result.state.data.files || {}).length === 0;
 
     // 4) Build sandbox URL
     const sandboxInstance = await getSandBox(sandboxId);
@@ -225,31 +241,45 @@ export const codeAgentFunction = inngest.createFunction(
 
     console.log("Sandbox URL:", sandBoxUrl);
 
-    // await step.run("save-result", async () => {
-    //   if (isError) {
-    //     return await prisma.message.create({
-    //       data: {
-    //         content: "Somthing went wrong generating the code. Please try again.",
-    //         role: "ASSISTANT",
-    //         type: "ERROR",},
-    //     });
-    //   }  
-    //   return await prisma.message.create({
-    //     data: {
-    //       content: result.state.data.summary,
-    //       role: "ASSISTANT",
-    //       type: "RESULT",
-    //       fragment:{
-    //         create:{
-    //           sandboxUrl: sandBoxUrl,
-    //           title: "Fragment",
-    //           files: result.state.data.files,
+    const agentState: AgentState = {
+      summary: parsed?.summary || "Generated code an summary.",
+      files: Object.fromEntries(
+        (toolResult?.updated || []).map((path: string) => [
+          path,
+          "File updated",
+        ])
+      ),
+    };
 
-    //         }
-    //       }
-    //     },
-    //     })
-    // });
+    const result = await step.run("save-result", async () => {
+      try {
+        return await prisma.message.create({
+          data: {
+            content: agentState.summary,
+            role: "ASSISTANT",
+            type: "RESULT",
+            fragment: {
+              create: {
+                sandboxUrl: sandBoxUrl,
+                title: "Generate Fragment",
+                files: agentState.files,
+              },
+            },
+          },
+          include: {
+            fragment: true,
+          },
+        });
+      } catch (error) {
+        return await prisma.message.create({
+          data: {
+            content: "Something went wrong generating the code.",
+            role: "ASSISTANT",
+            type: "ERROR",
+          },
+        });
+      }
+    });
 
     // 5) Return everything
     return {

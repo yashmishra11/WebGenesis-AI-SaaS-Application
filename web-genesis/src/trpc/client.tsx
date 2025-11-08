@@ -1,41 +1,35 @@
 // trpc/client.tsx
 "use client";
 
-import type { AppRouter } from "../trpc/routers/_app";
-import { httpBatchLink } from "@trpc/client";
 import { createTRPCReact } from "@trpc/react-query";
-import { QueryClientProvider, QueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { httpBatchLink } from "@trpc/client";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import superjson from "superjson";
+import { useState } from "react";
 
-// 👉 this gives you typed hooks (trpc.something.useQuery / useMutation)
+import type { AppRouter } from "../trpc/routers/_app";
+
 export const trpc = createTRPCReact<AppRouter>();
 
-// ✅ Create query client function
 function makeQueryClient() {
   return new QueryClient({
     defaultOptions: {
-      queries: {
-        staleTime: 30 * 1000, // 30 seconds
-      },
+      queries: { staleTime: 30 * 1000 },
     },
   });
 }
 
-export function TRPCReactProvider({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export function TRPCReactProvider({ children }: { children: React.ReactNode }) {
   const [queryClient] = useState(() => makeQueryClient());
   const [trpcClient] = useState(() =>
     trpc.createClient({
       links: [
         httpBatchLink({
-          url: process.env.NODE_ENV === 'production' 
-            ? 'https://yourdomain.com/api/trpc' 
-            : 'http://localhost:3000/api/trpc',
-          transformer: superjson,
+          url:
+            process.env.NODE_ENV === "production"
+              ? "https://yourdomain.com/api/trpc"
+              : "http://localhost:3000/api/trpc",
+          transformer: superjson, // ✅ moved here
         }),
       ],
     })
@@ -43,12 +37,7 @@ export function TRPCReactProvider({
 
   return (
     <trpc.Provider client={trpcClient} queryClient={queryClient}>
-      <QueryClientProvider client={queryClient}>
-        {children}
-      </QueryClientProvider>
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
     </trpc.Provider>
   );
 }
-
-// ✅ Fix: Return the trpc instance directly, not useContext
-export const useTRPC = () => trpc;
