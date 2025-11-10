@@ -9,6 +9,8 @@ interface Props {
     projectId: string;
   }>;
 }
+
+// main-page
 const Page = async ({ params }: Props) => {
   const { projectId } = await params;
   const queryClient = getQueryClient();
