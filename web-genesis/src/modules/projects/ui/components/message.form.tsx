@@ -15,8 +15,6 @@ interface Props {
   projectId: string;
 }
 
-const queryClient = useQueryClient();
-
 const formSchema = z.object({
   value: z
     .string()
@@ -25,6 +23,8 @@ const formSchema = z.object({
 });
 
 export const Messageform = ({ projectId }: Props) => {
+  const queryClient = useQueryClient();
+
   const [isFocused, setFocused] = useState(false);
   const showUsage = false;
 
@@ -85,7 +85,7 @@ export const Messageform = ({ projectId }: Props) => {
               minRows={2}
               maxRows={8}
               className="pt-4 resize-none border-none w-full outline-none bg-transparent "
-              placeholder="What would you like ti build"
+              placeholder="What would you like to build"
               onKeyDown={(e) => {
                 if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
                   e.preventDefault();

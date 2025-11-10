@@ -1,6 +1,5 @@
 "use client";
 
-import { trpc } from "@/trpc/server";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import {
   ResizableHandle,

@@ -3,11 +3,10 @@ import { Fragment, MessageRole, MessageType } from "@prisma/client";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import Image from "next/image";
-import { Code2, Code2Icon } from "lucide-react";
-
+import { Code2Icon } from "lucide-react";
 interface Messagecardprops {
   content: string;
-  role: string;
+  role: MessageRole;
   fragment: Fragment | null;
   createdAt: Date;
   isActiveFragment: boolean;
@@ -85,7 +84,8 @@ const AssistantMessage = ({
           height={20}
         />
         <span className="text-sm font-medium ">WebGenesis</span>
-        <span className="text-sm text-muted-foreground opacity-0 transition-opactiy group-hover:opacity-100">
+        <span className="text-sm text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100">
+          {" "}
           {format(createdAt, "HH:mm 'on' MMM, dd, yyyy")}
         </span>
       </div>
@@ -124,7 +124,7 @@ export const Messagecard = ({
   onFragmentClick,
   type,
 }: Messagecardprops) => {
-  if (role === "ASSISTANT") {
+  if (role === MessageRole.ASSISTANT) {
     return (
       <AssistantMessage
         content={content}

@@ -12,17 +12,18 @@ const Page = async ({ params }: Props) => {
   const { projectId } = await params;
   const queryClient = getQueryClient();
 
-  void queryClient.prefetchQuery(
-    trpc.messages.getMany.queryOptions({
-      projectId,
-    })
-  );
-
-  void queryClient.prefetchQuery(
-    trpc.projects.getOne.queryOptions({
-      id: projectId,
-    })
-  );
+  await Promise.all([
+    queryClient.prefetchQuery(
+      trpc.messages.getMany.queryOptions({
+        projectId,
+      })
+    ),
+    queryClient.prefetchQuery(
+      trpc.projects.getOne.queryOptions({
+        id: projectId,
+      })
+    ),
+  ]);
   return (
     <HydrationBoundary state={dehydrate(queryClient)}>
       <Suspense fallback={<p>Loading...</p>}>
