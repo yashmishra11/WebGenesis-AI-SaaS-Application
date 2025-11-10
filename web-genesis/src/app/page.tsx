@@ -1,24 +1,28 @@
 "use client";
 
-import { trpc } from "@/trpc/client";
+import { useTRPC } from "@/trpc/client";
 import { toast } from "sonner";
 import { useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useRouter } from "next/navigation";
+import { useMutation } from "@tanstack/react-query";
 
 const Page = () => {
   const [value, setValue] = useState("");
   const router = useRouter();
+  const trpc = useTRPC();
 
-  const createProject = trpc.projects.create.useMutation({
-    onError: (error) => {
-      toast.error(error.message);
-    },
-    onSuccess: (data) => {
-      router.push(`/projects/${data.id}`);
-    },
-  });
+  const createProject = useMutation(
+    trpc.projects.create.mutationOptions({
+      onError: (error) => {
+        toast.error(error.message);
+      },
+      onSuccess: (data) => {
+        router.push(`/projects/${data.id}`);
+      },
+    })
+  );
 
   return (
     <div className="h-screen w-screen flex items-center justify-center">

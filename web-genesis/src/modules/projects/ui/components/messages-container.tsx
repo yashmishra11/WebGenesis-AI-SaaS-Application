@@ -1,18 +1,19 @@
-import { trpc } from "@/trpc/server";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { Messagecard } from "./message-card";
 import { Messageform } from "./message.form";
 import { useEffect, useRef } from "react";
+import { useTRPC } from "@/trpc/client";
 
 interface Props {
   projectId: string;
 }
 
 export const MessagesContainer = ({ projectId }: Props) => {
+  const trpc = useTRPC();
   const bottomRef = useRef<HTMLDivElement>(null);
   const { data: messages } = useSuspenseQuery(
     trpc.messages.getMany.queryOptions({
-      projectId: projectId,
+      projectId,
     })
   );
 

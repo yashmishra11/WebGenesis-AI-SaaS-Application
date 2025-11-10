@@ -152,7 +152,7 @@ export const codeAgentFunction = inngest.createFunction(
 
     const response = await ollama.chat({
       // USE A BETTER MODEL - qwen2.5-coder is MUCH better for code generation
-      model: process.env.OLLAMA_MODEL || " qwen2.5-coder:3b",
+      model: "qwen2.5-coder:3b",
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: userPrompt },
@@ -174,9 +174,7 @@ export const codeAgentFunction = inngest.createFunction(
 
     // NEW: If parsing failed, use fallback
     if (!parsed || !parsed.tool) {
-      console.log(
-        "⚠️ No valid tool call detected, using fallback page generator"
-      );
+      console.log();
       parsed = createFallbackPage(userPrompt);
     }
 

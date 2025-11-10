@@ -3,16 +3,14 @@ import { getQueryClient, trpc } from "@/trpc/server";
 import { dehydrate, HydrationBoundary } from "@tanstack/react-query";
 import { Suspense } from "react";
 
-// Interfaces
 interface Props {
-  params: Promise<{
+  params: {
     projectId: string;
-  }>;
+  };
 }
 
-// main-page
 const Page = async ({ params }: Props) => {
-  const { projectId } = await params;
+  const { projectId } = params;
   const queryClient = getQueryClient();
 
   await Promise.all([
@@ -27,6 +25,7 @@ const Page = async ({ params }: Props) => {
       })
     ),
   ]);
+
   return (
     <HydrationBoundary state={dehydrate(queryClient)}>
       <Suspense fallback={<p>Loading...</p>}>

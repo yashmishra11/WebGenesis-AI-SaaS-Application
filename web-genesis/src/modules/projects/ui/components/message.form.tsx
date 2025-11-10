@@ -8,7 +8,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { ArrowUpIcon, Loader2Icon } from "lucide-react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { trpc } from "@/trpc/server";
+import { useTRPC } from "@/trpc/client";
 import { toast } from "sonner";
 
 interface Props {
@@ -24,6 +24,7 @@ const formSchema = z.object({
 
 export const Messageform = ({ projectId }: Props) => {
   const queryClient = useQueryClient();
+  const trpc = useTRPC();
 
   const [isFocused, setFocused] = useState(false);
   const showUsage = false;
