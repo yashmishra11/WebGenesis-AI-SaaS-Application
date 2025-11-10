@@ -152,7 +152,7 @@ export const codeAgentFunction = inngest.createFunction(
 
     const response = await ollama.chat({
       // USE A BETTER MODEL - qwen2.5-coder is MUCH better for code generation
-      model: process.env.OLLAMA_MODEL || "qwen2:1.5b",
+      model: process.env.OLLAMA_MODEL || " qwen2.5-coder:3b",
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: userPrompt },
@@ -255,6 +255,7 @@ export const codeAgentFunction = inngest.createFunction(
       try {
         return await prisma.message.create({
           data: {
+            projectId: event.data.projectId,
             content: agentState.summary,
             role: "ASSISTANT",
             type: "RESULT",
@@ -273,6 +274,7 @@ export const codeAgentFunction = inngest.createFunction(
       } catch (error) {
         return await prisma.message.create({
           data: {
+            projectId: event.data.projectId,
             content: "Something went wrong generating the code.",
             role: "ASSISTANT",
             type: "ERROR",
