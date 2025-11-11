@@ -1,7 +1,7 @@
 "use client";
 
 import { useSuspenseQuery } from "@tanstack/react-query";
-import { Fragment } from "@/generated/prisma" ;
+import { Fragment } from "@prisma/client";
 import {
   ResizableHandle,
   ResizablePanel,
@@ -17,7 +17,7 @@ interface Props {
 }
 
 export const ProjectView = ({ projectId }: Props) => {
-  const [activeFragment, setActiveFragment] =useState<Fragment | null>(null);
+  const [activeFragment, setActiveFragment] = useState<Fragment | null>(null);
   //   const { data: project } = useSuspenseQuery(
   //     trpc.projects.getOne.queryOptions({
   //       id: projectId,
@@ -35,21 +35,19 @@ export const ProjectView = ({ projectId }: Props) => {
           <Suspense fallback={<p>Loading Project...</p>}>
             <ProjectHeader projectId={projectId} />
           </Suspense>
-          
+
           <Suspense fallback={<p>Loading Messages...</p>}>
             <MessagesContainer
-             projectId={projectId} 
-             activeFragment={activeFragment}
-             setActiveFragment={setActiveFragment}
-             />
+              projectId={projectId}
+              activeFragment={activeFragment}
+              setActiveFragment={setActiveFragment}
+            />
           </Suspense>
         </ResizablePanel>
 
         <ResizableHandle withHandle />
         <ResizablePanel defaultSize={65} minSize={50}>
-          
           {!!activeFragment && <FragmentWeb data={activeFragment} />}
-
         </ResizablePanel>
       </ResizablePanelGroup>
     </div>

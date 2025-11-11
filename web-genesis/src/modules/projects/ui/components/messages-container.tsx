@@ -3,8 +3,8 @@ import { Messagecard } from "./message-card";
 import { Messageform } from "./message.form";
 import { useEffect, useRef } from "react";
 import { useTRPC } from "@/trpc/client";
-import { Fragment } from "@/generated/prisma" ;
 import { MessageLoading } from "./message-loading";
+import { Fragment } from "@prisma/client";
 
 interface Props {
   projectId: string;
@@ -12,21 +12,23 @@ interface Props {
   setActiveFragment: (fragment: Fragment | null) => void;
 }
 
-export const MessagesContainer = ({ 
+export const MessagesContainer = ({
   projectId,
   activeFragment,
   setActiveFragment,
- }: Props) => {
+}: Props) => {
   const trpc = useTRPC();
   const bottomRef = useRef<HTMLDivElement>(null);
   const { data: messages } = useSuspenseQuery(
-    trpc.messages.getMany.queryOptions({
-      projectId,
-    },
-    //TODO: temporary live message update
-    {refetchInterval: 5000,}
-  )
+    trpc.messages.getMany.queryOptions(
+      {
+        projectId,
+      },
+      //TODO: temporary live message update
+      { refetchInterval: 5000 }
+    )
   );
+
   //TODO: This is causing some issues with fragment selection
   // useEffect(() => {
   //   const lastAssistentMessageWithFragment = messages.findLast(

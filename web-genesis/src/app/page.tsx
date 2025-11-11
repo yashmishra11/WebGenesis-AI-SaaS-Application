@@ -28,6 +28,7 @@ const Page = () => {
     <div className="h-screen w-screen flex items-center justify-center">
       <div className="max-w-7xl mx-auto flex items-center flex-col gap-y-4 ">
         <Input
+          className="text-black"
           value={value}
           onChange={(e) => setValue(e.target.value)}
           placeholder="Type your message..."
