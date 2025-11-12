@@ -1,7 +1,7 @@
 "use client";
 
 import { useSuspenseQuery } from "@tanstack/react-query";
-import { Fragment } from "@/generated/prisma" ;
+import type { Fragment } from "@prisma/client";
 import {
   ResizableHandle,
   ResizablePanel,
