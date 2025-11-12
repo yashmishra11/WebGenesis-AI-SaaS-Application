@@ -239,14 +239,25 @@ export const codeAgentFunction = inngest.createFunction(
 
     console.log("Sandbox URL:", sandBoxUrl);
 
+    // ✅ FIX: Read actual file contents from sandbox instead of using placeholder text
+    const filesWithContent: { [path: string]: string } = {};
+    
+    if (toolResult?.updated && Array.isArray(toolResult.updated)) {
+      // Read actual file contents from the sandbox
+      for (const filePath of toolResult.updated) {
+        try {
+          const content = await sandboxInstance.files.read(filePath);
+          filesWithContent[filePath] = content;
+        } catch (error) {
+          console.error(`Failed to read file ${filePath}:`, error);
+          filesWithContent[filePath] = "// Error reading file content";
+        }
+      }
+    }
+
     const agentState: AgentState = {
-      summary: parsed?.summary || "Generated code an summary.",
-      files: Object.fromEntries(
-        (toolResult?.updated || []).map((path: string) => [
-          path,
-          "File updated",
-        ])
-      ),
+      summary: parsed?.summary || "Generated code and summary.",
+      files: filesWithContent, // ✅ Now contains actual code!
     };
 
     const result = await step.run("save-result", async () => {
