@@ -24,22 +24,37 @@ const Page = () => {
     })
   );
 
+  const handleSubmit = () => {
+    if (!value.trim()) {
+      toast.error("Please enter a message");
+      return;
+    }
+    createProject.mutate({ value: value.trim() });
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter" && !createProject.isPending) {
+      handleSubmit();
+    }
+  };
+
   return (
     <div className="h-screen w-screen flex items-center justify-center">
-      <div className="max-w-7xl mx-auto flex items-center flex-col gap-y-4 ">
+      <div className="max-w-7xl mx-auto flex items-center flex-col gap-y-4">
         <Input
           className="text-black"
           value={value}
           onChange={(e) => setValue(e.target.value)}
+          onKeyDown={handleKeyDown}
           placeholder="Type your message..."
+          disabled={createProject.isPending}
         />
 
         <Button
-          disabled={createProject.isPending}
-          onClick={() => createProject.mutate({ value: value })}
-          className="px-4 mt-2 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:opacity-50"
+          disabled={createProject.isPending || !value.trim()}
+          onClick={handleSubmit}
         >
-          {createProject.isPending ? "Loading..." : "Submit"}
+          {createProject.isPending ? "Creating..." : "Create Project"}
         </Button>
       </div>
     </div>
