@@ -81,8 +81,13 @@ export const ProjectView = ({ projectId }: Props) => {
             <TabsContent value="code" className="min-h-0">
               {!!activeFragment?.files && (
                 <FileExplorer
+<<<<<<< HEAD
                   files={activeFragment.files as { [path: string]: string }}
                 />
+=======
+                files={activeFragment.files as { [path: string]: string }}
+                 />
+>>>>>>> origin/main
               )}
             </TabsContent>
           </Tabs>

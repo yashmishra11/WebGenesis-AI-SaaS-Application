@@ -33,7 +33,11 @@ interface FileBreadcrumbProps {
 const FileBreadcrumb = ({ filePath }: FileBreadcrumbProps) => {
   const pathSegments = filePath.split("/");
   const maxSegments = 3;
+<<<<<<< HEAD
 
+=======
+  
+>>>>>>> origin/main
   const renderBreadcrumbItems = () => {
     if (pathSegments.length <= maxSegments) {
       // Show all segments if 3 or less
@@ -79,7 +83,13 @@ const FileBreadcrumb = ({ filePath }: FileBreadcrumbProps) => {
 
   return (
     <Breadcrumb>
+<<<<<<< HEAD
       <BreadcrumbList>{renderBreadcrumbItems()}</BreadcrumbList>
+=======
+      <BreadcrumbList>
+        {renderBreadcrumbItems()}
+      </BreadcrumbList>
+>>>>>>> origin/main
     </Breadcrumb>
   );
 };
@@ -221,4 +231,8 @@ export const FileExplorer = ({ files }: FileExplorerProps) => {
       </ResizablePanel>
     </ResizablePanelGroup>
   );
+<<<<<<< HEAD
 };
+=======
+};
+>>>>>>> origin/main
