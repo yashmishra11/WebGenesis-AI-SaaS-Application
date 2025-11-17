@@ -2,17 +2,23 @@
 import { inngest } from "./client";
 import { Sandbox } from "@e2b/code-interpreter";
 import { getSandBox } from "./utils";
-import { Ollama } from "ollama";
 import { PROMPT } from "./prompt";
 import prisma from "@/lib/db";
+import OpenAI from "openai"; // OpenRouter uses OpenAI SDK
 
 interface AgentState {
   summary: string;
   files: { [path: string]: string };
 }
 
-const ollama = new Ollama({
-  host: "http://127.0.0.1:11434",
+// Initialize OpenRouter client (uses OpenAI SDK)
+const openrouter = new OpenAI({
+  apiKey: process.env.OPENROUTER_API_KEY,
+  baseURL: "https://openrouter.ai/api/v1",
+  defaultHeaders: {
+    "HTTP-Referer": process.env.YOUR_SITE_URL || "http://localhost:3000",
+    "X-Title": process.env.YOUR_APP_NAME || "Code Agent App",
+  },
 });
 
 // Helper: extract first top-level JSON object from text (balanced braces)
@@ -144,26 +150,28 @@ export const codeAgentFunction = inngest.createFunction(
       return s.sandboxId;
     });
 
-    // 2) Call Ollama with system prompt
+    // 2) Call OpenRouter API with system prompt
     const systemPrompt = PROMPT;
     const userPrompt = event?.data?.value ?? "";
 
-    console.log("Calling Ollama with user prompt:", userPrompt);
+    console.log("Calling OpenRouter API with user prompt:", userPrompt);
 
-    const response = await ollama.chat({
-      // USE A BETTER MODEL - qwen2.5-coder is MUCH better for code generation
-      model: "qwen2.5-coder:3b",
+    const response = await openrouter.chat.completions.create({
+      model: "meta-llama/llama-3.3-70b-instruct", // Using Llama 3.3 70B on OpenRouter
+      // Alternative models you can use:
+      // "anthropic/claude-3.5-sonnet" - Most capable for code
+      // "google/gemini-2.0-flash-exp:free" - Fast and free
+      // "deepseek/deepseek-r1" - Great for reasoning
+      // "qwen/qwen-2.5-coder-32b-instruct" - Specialized for code
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: userPrompt },
       ],
-      options: {
-        temperature: 0.7,
-        num_predict: 2000, // Allow longer responses
-      },
+      temperature: 0.7,
+      max_tokens: 4000,
     });
 
-    const raw = response?.message?.content ?? "";
+    const raw = response?.choices?.[0]?.message?.content ?? "";
     console.log("Raw LLM response:", raw);
 
     let parsed: any = null;
@@ -174,7 +182,7 @@ export const codeAgentFunction = inngest.createFunction(
 
     // NEW: If parsing failed, use fallback
     if (!parsed || !parsed.tool) {
-      console.log();
+      console.log("Parsing failed, using fallback page");
       parsed = createFallbackPage(userPrompt);
     }
 
@@ -239,11 +247,10 @@ export const codeAgentFunction = inngest.createFunction(
 
     console.log("Sandbox URL:", sandBoxUrl);
 
-    // ✅ FIX: Read actual file contents from sandbox instead of using placeholder text
+    // Read actual file contents from sandbox
     const filesWithContent: { [path: string]: string } = {};
     
     if (toolResult?.updated && Array.isArray(toolResult.updated)) {
-      // Read actual file contents from the sandbox
       for (const filePath of toolResult.updated) {
         try {
           const content = await sandboxInstance.files.read(filePath);
@@ -257,7 +264,7 @@ export const codeAgentFunction = inngest.createFunction(
 
     const agentState: AgentState = {
       summary: parsed?.summary || "Generated code and summary.",
-      files: filesWithContent, // ✅ Now contains actual code!
+      files: filesWithContent,
     };
 
     const result = await step.run("save-result", async () => {
@@ -302,3 +309,5 @@ export const codeAgentFunction = inngest.createFunction(
     };
   }
 );
+
+//this one is with llama3.5 70b instruct
