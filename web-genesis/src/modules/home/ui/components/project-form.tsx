@@ -13,6 +13,7 @@ import { useTRPC } from "@/trpc/client";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { PROJECT_TEMPLATES } from "../../constants/constant";
+import { useClerk } from "@clerk/nextjs";
 
 const formSchema = z.object({
   value: z
@@ -25,6 +26,7 @@ export const ProjectForm = () => {
   const queryClient = useQueryClient();
   const trpc = useTRPC();
   const router = useRouter();
+  const clerk = useClerk();
 
   const [isFocused, setFocused] = useState(false);
 
@@ -48,6 +50,10 @@ export const ProjectForm = () => {
       onError: (error) => {
         // Todo: Redirect to pricing page if specific error
         toast.error(error.message);
+
+        if (error?.data?.code === "UNAUTHORIZED") {
+          clerk.openSignIn();
+        }
       },
     })
   );
