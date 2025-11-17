@@ -38,21 +38,16 @@ export const TreeView = ({ data, value, onSelect }: TreeViewProps) => {
             <SidebarGroupContent>
               <SidebarMenu>
                 {data.map((item, index) => (
-<<<<<<< HEAD
+
                   <Tree
-=======
-                    <Tree
->>>>>>> origin/main
+
                     key={index}
                     item={item}
                     selectedValue={value}
                     onSelect={onSelect}
                     parentPath=""
-<<<<<<< HEAD
                   />
-=======
-                    />
->>>>>>> origin/main
+
                 ))}
               </SidebarMenu>
             </SidebarGroupContent>
@@ -75,11 +70,8 @@ const Tree = ({ item, selectedValue, onSelect, parentPath }: TreeProps) => {
   const [name, ...items] = Array.isArray(item) ? item : [item];
   // FIX: Changed /name to /${name}
   const currentPath = parentPath ? `${parentPath}/${name}` : name;
-<<<<<<< HEAD
 
-=======
-  
->>>>>>> origin/main
+
   if (!items.length) {
     // It's a file
     const isSelected = selectedValue === currentPath;
@@ -123,8 +115,4 @@ const Tree = ({ item, selectedValue, onSelect, parentPath }: TreeProps) => {
       </Collapsible>
     </SidebarMenuItem>
   );
-<<<<<<< HEAD
 };
-=======
-};
->>>>>>> origin/main

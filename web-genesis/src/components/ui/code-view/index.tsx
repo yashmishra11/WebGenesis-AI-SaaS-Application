@@ -1,9 +1,5 @@
 "use client";
 
-<<<<<<< HEAD
-=======
-
->>>>>>> origin/main
 import { useEffect } from "react";
 import Prism from "prismjs";
 
@@ -32,7 +28,3 @@ export const CodeView = ({ code, lang }: Props) => {
     </pre>
   );
 };
-<<<<<<< HEAD
-=======
-
->>>>>>> origin/main

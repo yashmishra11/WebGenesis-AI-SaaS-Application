@@ -3,10 +3,6 @@ import { Messagecard } from "./message-card";
 import { Messageform } from "./message.form";
 import { useEffect, useRef } from "react";
 import { useTRPC } from "@/trpc/client";
-<<<<<<< HEAD
-=======
-import type { Fragment } from "@prisma/client";
->>>>>>> origin/main
 import { MessageLoading } from "./message-loading";
 import { Fragment } from "@prisma/client";
 
