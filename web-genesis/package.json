@@ -11,6 +11,8 @@
     "inngest:sync": "inngest-cli sync http://localhost:3000/api/inngest"
   },
   "dependencies": {
+    "@clerk/nextjs": "^6.35.1",
+    "@clerk/themes": "^2.4.36",
     "@e2b/code-interpreter": "^2.0.1",
     "@hookform/resolvers": "^5.2.1",
     "@inngest/agent-kit": "^0.9.0",
