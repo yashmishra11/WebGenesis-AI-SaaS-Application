@@ -3,8 +3,12 @@ import { Messagecard } from "./message-card";
 import { Messageform } from "./message.form";
 import { useEffect, useRef } from "react";
 import { useTRPC } from "@/trpc/client";
+<<<<<<< HEAD
+=======
 import type { Fragment } from "@prisma/client";
+>>>>>>> origin/main
 import { MessageLoading } from "./message-loading";
+import { Fragment } from "@prisma/client";
 
 interface Props {
   projectId: string;
@@ -12,31 +16,34 @@ interface Props {
   setActiveFragment: (fragment: Fragment | null) => void;
 }
 
-export const MessagesContainer = ({ 
+export const MessagesContainer = ({
   projectId,
   activeFragment,
   setActiveFragment,
- }: Props) => {
+}: Props) => {
   const trpc = useTRPC();
   const bottomRef = useRef<HTMLDivElement>(null);
+  const lastMessageIdRef = useRef<string | null>(null);
   const { data: messages } = useSuspenseQuery(
-    trpc.messages.getMany.queryOptions({
-      projectId,
-    },
-    //TODO: temporary live message update
-    {refetchInterval: 5000,}
-  )
+    trpc.messages.getMany.queryOptions(
+      {
+        projectId,
+      },
+      //TODO: temporary live message update
+      { refetchInterval: 5000 }
+    )
   );
-  //TODO: This is causing some issues with fragment selection
-  // useEffect(() => {
-  //   const lastAssistentMessageWithFragment = messages.findLast(
-  //     (message) => message.role === "ASSISTANT" && !!message.fragment,
-  //   );
 
-  //   if (lastAssistentMessageWithFragment) {
-  //     setActiveFragment(lastAssistentMessageWithFragment.fragment);
-  //   }
-  // }, [messages, setActiveFragment]);
+  useEffect(() => {
+    const lastMessage = messages.findLast(
+      (message) => message.role === "ASSISTANT"
+    );
+
+    if (lastMessage?.fragment && lastMessage.id !== lastMessageIdRef.current) {
+      setActiveFragment(lastMessage.fragment);
+      lastMessageIdRef.current = lastMessage.id;
+    }
+  }, [messages, setActiveFragment]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView();
