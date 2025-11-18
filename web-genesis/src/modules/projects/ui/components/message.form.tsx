@@ -1,15 +1,17 @@
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import TextareaAutosize from "react-textarea-autosize";
+import { useRouter } from "next/navigation";
 import z from "zod";
 import { Form, FormField } from "@/components/ui/form";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { ArrowUpIcon, Loader2Icon } from "lucide-react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTRPC } from "@/trpc/client";
 import { toast } from "sonner";
+import { Usage } from "./usage";
 
 interface Props {
   projectId: string;
@@ -25,9 +27,12 @@ const formSchema = z.object({
 export const Messageform = ({ projectId }: Props) => {
   const queryClient = useQueryClient();
   const trpc = useTRPC();
+const router = useRouter();
+
+  const { data: usage } = useQuery(trpc.usage.status.queryOptions());
 
   const [isFocused, setFocused] = useState(false);
-  const showUsage = false;
+  const showUsage = !!usage;
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -44,12 +49,18 @@ export const Messageform = ({ projectId }: Props) => {
           trpc.messages.getMany.queryOptions({ projectId })
         );
 
-        // Todo: Invalidate usage status
+        queryClient.invalidateQueries(
+          trpc.usage.status.queryOptions()
+        )
+
       },
 
       onError: (error) => {
-        // Todo: Redirect to pricing page if specific error
         toast.error(error.message);
+
+        if(error.data?.code === "TOO_MANY_REQUESTS") {
+          router.push("/pricing");
+        }
       },
     })
   );
@@ -65,6 +76,7 @@ export const Messageform = ({ projectId }: Props) => {
 
   return (
     <Form {...form}>
+      {showUsage && <Usage points={usage.remainingPoints} msBeforeNext={usage.msBeforeNext} />}
       <form
         className={cn(
           "relative border p-4 pt-1 rounded-xl bg-sidebar dark:bg-sidebar transition-all ",

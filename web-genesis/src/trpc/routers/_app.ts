@@ -1,3 +1,4 @@
+import { usageRouter } from "@/modules/usage/server/procedures";
 import { z } from "zod";
 import { createTRPCRouter } from "../init";
 import { baseProcedure } from "../../trpc/init";
@@ -6,6 +7,7 @@ import { inngest } from "@/inngest/client";
 import { projectsRouter } from "@/modules/projects/server/procedures";
 
 export const appRouter = createTRPCRouter({
+  usage: usageRouter,
   messages: messagesRouter,
   projects: projectsRouter,
 
