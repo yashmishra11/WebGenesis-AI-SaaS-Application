@@ -4,6 +4,7 @@ import Link from "next/link";
 import { EyeIcon, CodeIcon, CrownIcon } from "lucide-react";
 // import { useSuspenseQuery } from "@tanstack/react-query";
 import type { Fragment } from "@prisma/client";
+import { useAuth } from "@clerk/nextjs";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   ResizableHandle,
@@ -22,6 +23,10 @@ interface Props {
 }
 
 export const ProjectView = ({ projectId }: Props) => {
+const { has } = useAuth();
+const hasProAccess = has?.({ plan: "pro" });
+// const isFreeTier = has?.({ plan: "free_user" });
+
   const [activeFragment, setActiveFragment] = useState<Fragment | null>(null);
   const [tabState, setTabState] = useState<"preview" | "code">("preview");
   //   const { data: project } = useSuspenseQuery(
@@ -70,11 +75,13 @@ export const ProjectView = ({ projectId }: Props) => {
               </TabsList>
 
               <div className="ml-auto flex items-center gap-x-2">
+                {!hasProAccess && (
                 <Button asChild size="sm" variant="tertiary">
                   <Link href="/pricing">
-                    <CrownIcon /> Upgrade Plan
+                    <CrownIcon /> Upgrade
                   </Link>
                 </Button>
+                )}
                 <Profile />
               </div>
             </div>
