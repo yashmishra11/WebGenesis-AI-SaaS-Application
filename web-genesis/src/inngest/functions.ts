@@ -4,29 +4,25 @@ import { Sandbox } from "@e2b/code-interpreter";
 import { getSandBox } from "./utils";
 import { FRAGMENT_TITLE_PROMPT, PROMPT, RESPONSE_PROMPT } from "./prompt";
 import prisma from "@/lib/db";
-import OpenAI from "openai";
+import Groq from "groq-sdk";
 import { createState, type Message } from "@inngest/agent-kit";
-import { parseAgentOutput } from "@/lib/utils";
 
 interface AgentState {
   summary: string;
   files: { [path: string]: string };
 }
 
-// Initialize OpenRouter client
-const openrouter = new OpenAI({
-  apiKey: process.env.OPENROUTER_API_KEY,
-  baseURL: "https://openrouter.ai/api/v1",
-  defaultHeaders: {
-    "HTTP-Referer": process.env.YOUR_SITE_URL || "http://localhost:3000",
-    "X-Title": process.env.YOUR_APP_NAME || "Code Agent App",
-  },
+// Initialize Groq client
+const groq = new Groq({
+  apiKey: process.env.GROQ_API_KEY,
+
+  
 });
 
-// Helper function to call OpenRouter
-async function callOpenRouter(systemPrompt: string, userPrompt: string) {
-  const response = await openrouter.chat.completions.create({
-    model: "meta-llama/llama-3.3-70b-instruct",
+// Helper function to call Groq
+async function callGroq(systemPrompt: string, userPrompt: string) {
+  const response = await groq.chat.completions.create({
+    model: "llama-3.3-70b-versatile", // Groq's fastest Llama 3.3 70B model
     messages: [
       { role: "system", content: systemPrompt },
       { role: "user", content: userPrompt },
@@ -201,10 +197,10 @@ export const codeAgentFunction = inngest.createFunction(
     const systemPrompt = PROMPT;
     const userPrompt = event?.data?.value ?? "";
 
-    console.log("Calling OpenRouter API with user prompt:", userPrompt);
+    console.log("Calling Groq API with user prompt:", userPrompt);
 
-    const response = await openrouter.chat.completions.create({
-      model: "meta-llama/llama-3.3-70b-instruct",
+    const response = await groq.chat.completions.create({
+      model: "llama-3.3-70b-versatile",
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: userPrompt },
@@ -304,20 +300,20 @@ export const codeAgentFunction = inngest.createFunction(
       files: filesWithContent,
     };
 
-    // Generate fragment title using OpenRouter directly
+    // Generate fragment title using Groq
     const fragmentTitleOutput = await step.run("generate-fragment-title", async () => {
       try {
-        return await callOpenRouter(FRAGMENT_TITLE_PROMPT, agentState.summary);
+        return await callGroq(FRAGMENT_TITLE_PROMPT, agentState.summary);
       } catch (error) {
         console.error("Fragment title generation error:", error);
         return "Generated Page";
       }
     });
 
-    // Generate response using OpenRouter directly
+    // Generate response using Groq
     const responseOutput = await step.run("generate-response", async () => {
       try {
-        return await callOpenRouter(RESPONSE_PROMPT, agentState.summary);
+        return await callGroq(RESPONSE_PROMPT, agentState.summary);
       } catch (error) {
         console.error("Response generation error:", error);
         return "Successfully generated your code.";
