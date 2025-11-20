@@ -2,16 +2,18 @@
 import { inngest } from "./client";
 import { Sandbox } from "@e2b/code-interpreter";
 import { getSandBox } from "./utils";
-import { PROMPT } from "./prompt";
+import { FRAGMENT_TITLE_PROMPT, PROMPT, RESPONSE_PROMPT } from "./prompt";
 import prisma from "@/lib/db";
-import OpenAI from "openai"; // OpenRouter uses OpenAI SDK
+import OpenAI from "openai";
+import { createState, type Message } from "@inngest/agent-kit";
+import { parseAgentOutput } from "@/lib/utils";
 
 interface AgentState {
   summary: string;
   files: { [path: string]: string };
 }
 
-// Initialize OpenRouter client (uses OpenAI SDK)
+// Initialize OpenRouter client
 const openrouter = new OpenAI({
   apiKey: process.env.OPENROUTER_API_KEY,
   baseURL: "https://openrouter.ai/api/v1",
@@ -21,7 +23,22 @@ const openrouter = new OpenAI({
   },
 });
 
-// Helper: extract first top-level JSON object from text (balanced braces)
+// Helper function to call OpenRouter
+async function callOpenRouter(systemPrompt: string, userPrompt: string) {
+  const response = await openrouter.chat.completions.create({
+    model: "meta-llama/llama-3.3-70b-instruct",
+    messages: [
+      { role: "system", content: systemPrompt },
+      { role: "user", content: userPrompt },
+    ],
+    temperature: 0.7,
+    max_tokens: 4000,
+  });
+  
+  return response.choices[0].message.content || "";
+}
+
+// Extract JSON from text
 function extractJSONBlock(text: string): any | null {
   const start = text.indexOf("{");
   if (start === -1) return null;
@@ -44,7 +61,7 @@ function extractJSONBlock(text: string): any | null {
   return null;
 }
 
-// NEW: Fallback function to create a basic page when LLM fails
+// Fallback page generator
 function createFallbackPage(userPrompt: string) {
   return {
     tool: "createOrUpdateFiles",
@@ -95,7 +112,7 @@ export default function Home() {
   };
 }
 
-// ---------- Tools (use getSandBox(sandboxId) to access sandbox instance) ----------
+// Tool functions
 async function runTerminal(command: string, sandboxId: string) {
   const sandbox = await getSandBox(sandboxId);
   const buffers = { stdout: "", stderr: "" };
@@ -137,32 +154,57 @@ async function readFiles(files: string[], sandboxId: string) {
   return out;
 }
 
-// ---------- helloWorld Inngest function ----------
+// Main Inngest function
 export const codeAgentFunction = inngest.createFunction(
   { id: "code-agent" },
   { event: "code-agent/run" },
   async (ctx) => {
     const { step, event } = ctx;
 
-    // 1) Create sandbox and keep sandboxId only
     const sandboxId = await step.run("create-sandbox", async () => {
       const s = await Sandbox.create("web-test");
       return s.sandboxId;
     });
 
-    // 2) Call OpenRouter API with system prompt
+    const previousMessages = await step.run("get-previous-messages", async () => {
+      const formattedMessages: Message[] = [];
+      const messages = await prisma.message.findMany({
+        where: {
+          projectId: event.data.projectId,
+        },
+        orderBy: {
+          createdAt: "desc",
+        },
+      });
+
+      for (const message of messages) {
+        formattedMessages.push({
+          type: "text",
+          role: message.role === "ASSISTANT" ? "assistant" : "user",
+          content: message.content,
+        });
+      }
+
+      return formattedMessages;
+    });
+
+    const state = createState<AgentState>(
+      {
+        summary: "",
+        files: {},
+      },
+      {
+        messages: previousMessages,
+      }
+    );
+
     const systemPrompt = PROMPT;
     const userPrompt = event?.data?.value ?? "";
 
     console.log("Calling OpenRouter API with user prompt:", userPrompt);
 
     const response = await openrouter.chat.completions.create({
-      model: "meta-llama/llama-3.3-70b-instruct", // Using Llama 3.3 70B on OpenRouter
-      // Alternative models you can use:
-      // "anthropic/claude-3.5-sonnet" - Most capable for code
-      // "google/gemini-2.0-flash-exp:free" - Fast and free
-      // "deepseek/deepseek-r1" - Great for reasoning
-      // "qwen/qwen-2.5-coder-32b-instruct" - Specialized for code
+      model: "meta-llama/llama-3.3-70b-instruct",
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: userPrompt },
@@ -177,10 +219,8 @@ export const codeAgentFunction = inngest.createFunction(
     let parsed: any = null;
     let toolResult: any = null;
 
-    // 3) Try to parse a tool call (JSON) from the assistant output
     parsed = extractJSONBlock(raw);
 
-    // NEW: If parsing failed, use fallback
     if (!parsed || !parsed.tool) {
       console.log("Parsing failed, using fallback page");
       parsed = createFallbackPage(userPrompt);
@@ -227,7 +267,6 @@ export const codeAgentFunction = inngest.createFunction(
         }
       } catch (err: any) {
         console.error("Tool execution error:", err);
-        // On error, still try to create a fallback page
         try {
           const fallback = createFallbackPage(userPrompt);
           toolResult = await createOrUpdateFiles(
@@ -240,14 +279,12 @@ export const codeAgentFunction = inngest.createFunction(
       }
     }
 
-    // 4) Build sandbox URL
     const sandboxInstance = await getSandBox(sandboxId);
     const host = await sandboxInstance.getHost(3000);
     const sandBoxUrl = `https://${host}`;
 
     console.log("Sandbox URL:", sandBoxUrl);
 
-    // Read actual file contents from sandbox
     const filesWithContent: { [path: string]: string } = {};
     
     if (toolResult?.updated && Array.isArray(toolResult.updated)) {
@@ -267,18 +304,38 @@ export const codeAgentFunction = inngest.createFunction(
       files: filesWithContent,
     };
 
+    // Generate fragment title using OpenRouter directly
+    const fragmentTitleOutput = await step.run("generate-fragment-title", async () => {
+      try {
+        return await callOpenRouter(FRAGMENT_TITLE_PROMPT, agentState.summary);
+      } catch (error) {
+        console.error("Fragment title generation error:", error);
+        return "Generated Page";
+      }
+    });
+
+    // Generate response using OpenRouter directly
+    const responseOutput = await step.run("generate-response", async () => {
+      try {
+        return await callOpenRouter(RESPONSE_PROMPT, agentState.summary);
+      } catch (error) {
+        console.error("Response generation error:", error);
+        return "Successfully generated your code.";
+      }
+    });
+
     const result = await step.run("save-result", async () => {
       try {
         return await prisma.message.create({
           data: {
             projectId: event.data.projectId,
-            content: agentState.summary,
+            content: responseOutput,
             role: "ASSISTANT",
             type: "RESULT",
             fragment: {
               create: {
                 sandboxUrl: sandBoxUrl,
-                title: "Generate Fragment",
+                title: fragmentTitleOutput,
                 files: agentState.files,
               },
             },
@@ -288,6 +345,7 @@ export const codeAgentFunction = inngest.createFunction(
           },
         });
       } catch (error) {
+        console.error("Database save error:", error);
         return await prisma.message.create({
           data: {
             projectId: event.data.projectId,
@@ -299,15 +357,13 @@ export const codeAgentFunction = inngest.createFunction(
       }
     });
 
-    // 5) Return everything
     return {
       raw,
       parsed,
       toolResult,
       sandboxId,
       sandBoxUrl,
+      result,
     };
   }
 );
-
-//this one is with llama3.5 70b instruct

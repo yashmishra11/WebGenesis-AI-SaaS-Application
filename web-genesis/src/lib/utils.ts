@@ -2,6 +2,7 @@ import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
 
 import { type TreeItem } from "@/types";
+import { AgentResult, Message, TextMessage } from "@inngest/agent-kit";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -79,3 +80,19 @@ export function convertFilesToTreeItems(
   const result = convertNode(tree);
   return Array.isArray(result) ? result : [result];
 }
+
+export   const parseAgentOutput = (value: Message[]) => {
+            const output = value[0];
+
+            if (output.type !=="text"){
+              return "Fragment";
+            }
+
+              if(Array.isArray(output.content)){
+                return output.content.map((txt) => txt).join("");
+          }else{
+            return output.content
+
+          }
+        
+        };
