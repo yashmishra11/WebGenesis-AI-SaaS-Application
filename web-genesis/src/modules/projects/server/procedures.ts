@@ -14,6 +14,9 @@ export const projectsRouter = createTRPCRouter({
       })
     )
     .query(async ({ input, ctx }) => {
+      // throw new TRPCError({ code: "FORBIDDEN_REQUEST"});
+
+
       const existingProjects = await prisma.project.findUnique({
         where: {
           id: input.id,
