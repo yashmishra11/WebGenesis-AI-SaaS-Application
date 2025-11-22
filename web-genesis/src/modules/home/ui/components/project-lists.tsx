@@ -10,9 +10,15 @@ import { useUser } from "@clerk/nextjs";
 export const ProjectsList = () => {
   const trpc = useTRPC();
   const { user } = useUser();
+  
+  // Call useQuery unconditionally, but only when user exists
+  const { data: projects } = useQuery({
+    ...trpc.projects.getMany.queryOptions(),
+    enabled: !!user, // Only run query when user is available
+  });
 
+  // Now it's safe to return early after all hooks are called
   if (!user) return null;
-  const { data: projects } = useQuery(trpc.projects.getMany.queryOptions());
 
   return (
     <div className="w-full bg-white dark:bg-sidebar rounded-xl p-8 border flex flex-col gap-y-6 sm:gap-y-4">

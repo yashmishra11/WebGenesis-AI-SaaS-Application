@@ -6,6 +6,7 @@ import { FRAGMENT_TITLE_PROMPT, PROMPT, RESPONSE_PROMPT } from "./prompt";
 import prisma from "@/lib/db";
 import Groq from "groq-sdk";
 import { createState, type Message } from "@inngest/agent-kit";
+import { SANDBOX_TIMEOUT } from "./types";
 
 interface AgentState {
   summary: string;
@@ -159,6 +160,7 @@ export const codeAgentFunction = inngest.createFunction(
 
     const sandboxId = await step.run("create-sandbox", async () => {
       const s = await Sandbox.create("web-test");
+        await s.setTimeout(SANDBOX_TIMEOUT);
       return s.sandboxId;
     });
 
@@ -171,6 +173,7 @@ export const codeAgentFunction = inngest.createFunction(
         orderBy: {
           createdAt: "desc",
         },
+        take: 5,
       });
 
       for (const message of messages) {
