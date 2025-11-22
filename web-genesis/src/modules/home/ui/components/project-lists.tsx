@@ -11,10 +11,13 @@ export const ProjectsList = () => {
   const trpc = useTRPC();
   const { user } = useUser();
   
-  // Call useQuery unconditionally, but only when user exists
+  // Get query options first
+  const queryOptions = trpc.projects.getMany.queryOptions();
+  
+  // Use useQuery with enabled option
   const { data: projects } = useQuery({
-    ...trpc.projects.getMany.queryOptions(),
-    enabled: !!user, // Only run query when user is available
+    ...queryOptions,
+    enabled: !!user,
   });
 
   // Now it's safe to return early after all hooks are called
