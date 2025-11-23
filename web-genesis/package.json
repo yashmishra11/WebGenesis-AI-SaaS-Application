@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "next lint",
     "inngest": "inngest-cli dev",
-    "inngest:sync": "inngest-cli sync http://localhost:3000/api/inngest"
+    "inngest:sync": "inngest-cli sync http://localhost:3000/api/inngest",
+    "postinstall": "prisma generate"
   },
   "dependencies": {
     "@clerk/nextjs": "^6.35.1",
