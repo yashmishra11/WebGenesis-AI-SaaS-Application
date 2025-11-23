@@ -10,9 +10,18 @@ import { useUser } from "@clerk/nextjs";
 export const ProjectsList = () => {
   const trpc = useTRPC();
   const { user } = useUser();
+  
+  // Get query options first
+  const queryOptions = trpc.projects.getMany.queryOptions();
+  
+  // Use useQuery with enabled option
+  const { data: projects } = useQuery({
+    ...queryOptions,
+    enabled: !!user,
+  });
 
+  // Now it's safe to return early after all hooks are called
   if (!user) return null;
-  const { data: projects } = useQuery(trpc.projects.getMany.queryOptions());
 
   return (
     <div className="w-full bg-white dark:bg-sidebar rounded-xl p-8 border flex flex-col gap-y-6 sm:gap-y-4">

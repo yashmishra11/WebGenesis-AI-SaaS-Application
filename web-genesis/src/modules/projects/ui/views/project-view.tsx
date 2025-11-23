@@ -18,14 +18,15 @@ import { FragmentWeb } from "../components/fragment-web";
 import { Button } from "@/components/ui/button";
 import { FileExplorer } from "@/components/file-explorer";
 import { Profile } from "@/components/user-control";
+import { ErrorBoundary } from "react-error-boundary";
 interface Props {
   projectId: string;
 }
 
 export const ProjectView = ({ projectId }: Props) => {
-const { has } = useAuth();
-const hasProAccess = has?.({ plan: "pro" });
-// const isFreeTier = has?.({ plan: "free_user" });
+  const { has } = useAuth();
+  const hasProAccess = has?.({ plan: "pro" });
+  // const isFreeTier = has?.({ plan: "free_user" });
 
   const [activeFragment, setActiveFragment] = useState<Fragment | null>(null);
   const [tabState, setTabState] = useState<"preview" | "code">("preview");
@@ -43,19 +44,21 @@ const hasProAccess = has?.({ plan: "pro" });
           minSize={20}
           className="flex flex-col min-h-0"
         >
-          <Suspense fallback={<p>Loading Project...</p>}>
-            <ProjectHeader projectId={projectId} />
-          </Suspense>
-
-          <Suspense fallback={<p>Loading Messages...</p>}>
-            <MessagesContainer
-              projectId={projectId}
-              activeFragment={activeFragment}
-              setActiveFragment={setActiveFragment}
-            />
-          </Suspense>
+          <ErrorBoundary fallback={<p>project header error...</p>}>
+            <Suspense fallback={<p>Loading Project...</p>}>
+              <ProjectHeader projectId={projectId} />
+            </Suspense>
+          </ErrorBoundary>
+          <ErrorBoundary fallback={<p>Messages error...</p>}>
+            <Suspense fallback={<p>Loading Messages...</p>}>
+              <MessagesContainer
+                projectId={projectId}
+                activeFragment={activeFragment}
+                setActiveFragment={setActiveFragment}
+              />
+            </Suspense>
+          </ErrorBoundary>
         </ResizablePanel>
-
         <ResizableHandle className="hover:bg-primary transition-colors" />
         <ResizablePanel defaultSize={65} minSize={50}>
           <Tabs
@@ -76,11 +79,11 @@ const hasProAccess = has?.({ plan: "pro" });
 
               <div className="ml-auto flex items-center gap-x-2">
                 {!hasProAccess && (
-                <Button asChild size="sm" variant="tertiary">
-                  <Link href="/pricing">
-                    <CrownIcon /> Upgrade
-                  </Link>
-                </Button>
+                  <Button asChild size="sm" variant="tertiary">
+                    <Link href="/pricing">
+                      <CrownIcon /> Upgrade
+                    </Link>
+                  </Button>
                 )}
                 <Profile />
               </div>
