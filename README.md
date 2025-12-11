@@ -88,10 +88,6 @@ await app.create({
 - **Scalable Solutions**: Grow from startup to enterprise with ease
 - **Developer Experience**: Intuitive tools designed for modern development workflows
 
-## 📚 Documentation
-
-For detailed documentation, visit [your-documentation-link]
-
 ## 🤝 Contributing
 
 Contributions are welcome! Please follow these steps:
@@ -115,3 +111,4 @@ This project is licensed under the [JAAFR](LICENSE)
 ---
 
 **⭐ If you find this project useful, please consider giving it a star!**
+https://web-genesis-ai-saa-s-application.vercel.app/sign-in?redirect_url=https%3A%2F%2Fweb-genesis-ai-saa-s-application.vercel.app%2F
