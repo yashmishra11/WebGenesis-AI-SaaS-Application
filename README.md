@@ -112,18 +112,6 @@ This project is licensed under the [JAAFR](LICENSE)
 - **Shan** - [@Mohdshan09](https://github.com/Mohdshan09)
 - **Prajjval** - [@prajjval9579](https://github.com/prajjval9579)
 
-
-## 📞 Contact
-
-For questions or support, please reach out:
-- Email: [your-email@example.com]
-- GitHub Issues: [Create an issue](https://github.com/yashmishra11/WebGenesis-AI-SaaS-Application/issues)
-
-## 🙏 Acknowledgments
-
-- Thanks to all contributors who have helped shape WebGenesis
-- Special thanks to the open-source community
-
 ---
 
 **⭐ If you find this project useful, please consider giving it a star!**
