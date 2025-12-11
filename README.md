@@ -58,10 +58,9 @@ npm start
 Create a `.env` file in the root directory with the following variables:
 
 ```env
-API_KEY=your_api_key
-DATABASE_URL=your_database_url
-CLOUD_SERVICE_KEY=your_cloud_service_key
-AI_MODEL_ENDPOINT=your_ai_endpoint
+GROQ_API_KEY=
+E2B_API_KEY=e2b_db3fb7c34f6f1f5aad88ec88a7d87a4dd45f247d
+DATABASE_URL='postgresql://neondb_owner:npg_pvH8BQcD5GhT@ep-jolly-grass-ad1aedu0-pooler.c-2.us-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require'
 ```
 
 ## 💻 Usage
