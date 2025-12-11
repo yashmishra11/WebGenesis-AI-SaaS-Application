@@ -22,7 +22,7 @@ WebGenesis is an innovative AI-powered Software-as-a-Service (SaaS) platform des
 *AI-generated results and application output*
 
 ### Workflow
-![Working Flowchart](./images/working_flowchart.webp)
+![Working Flowchart](./images/working_flowchart.png)
 *Complete workflow architecture and process flow*
 
 ## 🛠️ Tech Stack
