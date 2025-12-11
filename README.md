@@ -104,11 +104,14 @@ Contributions are welcome! Please follow these steps:
 
 ## 📄 License
 
-This project is licensed under the [MIT License](LICENSE)
+This project is licensed under the [JAAFR](LICENSE)
 
 ## 👥 Team
 
-- **Yash Mishra** - [@yashmishra11](https://github.com/yashmishra11)
+- **Yash** - [@yashmishra11](https://github.com/yashmishra11)
+- **Shan** - [@Mohdshan09](https://github.com/Mohdshan09)
+- **Prajjval** - [@prajjval9579](https://github.com/prajjval9579)
+
 
 ## 📞 Contact
 
