@@ -18,7 +18,7 @@ WebGenesis is an innovative AI-powered Software-as-a-Service (SaaS) platform des
 *WebGenesis landing page and main interface*
 
 ### Output
-![Output](./images/output.jpeg)
+![Output](./images/output)
 *AI-generated results and application output*
 
 ### Workflow
