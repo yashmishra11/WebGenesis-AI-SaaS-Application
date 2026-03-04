@@ -22,7 +22,7 @@ export const messagesRouter = createTRPCRouter({
           },
         },
         orderBy: {
-          updatedAt: "desc",
+          createdAt: "asc",
         },
         include: {
           fragment: true,
