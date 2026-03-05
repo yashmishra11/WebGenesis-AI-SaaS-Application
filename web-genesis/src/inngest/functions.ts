@@ -2,10 +2,10 @@ import { inngest } from "./client";
 import { Sandbox } from "@e2b/code-interpreter";
 import { getSandBox } from "./utils";
 import { FRAGMENT_TITLE_PROMPT, PROMPT, RESPONSE_PROMPT } from "./prompt";
-import prisma from "@/lib/db";
 import Groq from "groq-sdk";
 import { SANDBOX_TIMEOUT } from "./types";
 import { z } from "zod";
+import { prisma } from "@/lib/db";
 
 interface AgentState {
   summary: string;
@@ -150,7 +150,10 @@ function parseToolCall(rawText: string): ToolCall | null {
 
 function isSafeRelativePath(path: string) {
   return (
-    !!path && !path.startsWith("/") && !path.includes("..") && !path.includes("\\")
+    !!path &&
+    !path.startsWith("/") &&
+    !path.includes("..") &&
+    !path.includes("\\")
   );
 }
 
@@ -342,64 +345,72 @@ export const codeAgentFunction = inngest.createFunction(
 
       const sandboxInstance = await getSandBox(sandboxId);
 
-      const latestFragmentFiles = await step.run("get-latest-fragment-files", async () => {
-        const latestFragment = await prisma.fragment.findFirst({
-          where: {
-            message: {
-              projectId: event.data.projectId,
-              type: "RESULT",
+      const latestFragmentFiles = await step.run(
+        "get-latest-fragment-files",
+        async () => {
+          const latestFragment = await prisma.fragment.findFirst({
+            where: {
+              message: {
+                projectId: event.data.projectId,
+                type: "RESULT",
+              },
             },
-          },
-          orderBy: {
-            createdAt: "desc",
-          },
-          select: {
-            files: true,
-          },
-        });
+            orderBy: {
+              createdAt: "desc",
+            },
+            select: {
+              files: true,
+            },
+          });
 
-        return normalizeFragmentFiles(latestFragment?.files);
-      });
+          return normalizeFragmentFiles(latestFragment?.files);
+        },
+      );
 
       if (latestFragmentFiles.length) {
         await createOrUpdateFiles(latestFragmentFiles, sandboxInstance);
       }
 
-    const previousMessages = await step.run("get-previous-messages", async () => {
-      const messages = await prisma.message.findMany({
-        where: {
-          projectId: event.data.projectId,
-        },
-        orderBy: {
-          createdAt: "desc",
-        },
-        take: 8,
-      });
-
-      return messages.reverse().map((message) => ({
-        role: message.role === "ASSISTANT" ? "assistant" : "user",
-        content: message.content,
-      }));
-    });
-
-    const conversationMessages: ModelMessage[] = previousMessages.map((message) => ({
-      role: message.role as "assistant" | "user",
-      content: message.content,
-    }));
-
-    const agentMessages: ModelMessage[] = [
-      { role: "system", content: PROMPT },
-      ...(latestFragmentFiles.length
-        ? [
-            {
-              role: "system" as const,
-              content: buildExistingFilesContext(latestFragmentFiles),
+      const previousMessages = await step.run(
+        "get-previous-messages",
+        async () => {
+          const messages = await prisma.message.findMany({
+            where: {
+              projectId: event.data.projectId,
             },
-          ]
-        : []),
-      ...conversationMessages,
-      { role: "user", content: userPrompt },
-    ];
+            orderBy: {
+              createdAt: "desc",
+            },
+            take: 8,
+          });
+
+          return messages.reverse().map((message) => ({
+            role: message.role === "ASSISTANT" ? "assistant" : "user",
+            content: message.content,
+          }));
+        },
+      );
+
+      const conversationMessages: ModelMessage[] = previousMessages.map(
+        (message) => ({
+          role: message.role as "assistant" | "user",
+          content: message.content,
+        }),
+      );
+
+      const agentMessages: ModelMessage[] = [
+        { role: "system", content: PROMPT },
+        ...(latestFragmentFiles.length
+          ? [
+              {
+                role: "system" as const,
+                content: buildExistingFilesContext(latestFragmentFiles),
+              },
+            ]
+          : []),
+        ...conversationMessages,
+        { role: "user", content: userPrompt },
+      ];
 
       let lastRaw = "";
       let lastParsed: ToolCall | null = null;
@@ -408,80 +419,85 @@ export const codeAgentFunction = inngest.createFunction(
       let finalSummary = "Generated code and summary.";
       let assistantErrorMessage: string | null = null;
 
-    for (let i = 0; i < MAX_AGENT_STEPS; i++) {
-      let response;
-      try {
-        response = await groq.chat.completions.create({
-          model: GROQ_MODEL,
-          messages: agentMessages,
-          temperature: 0.4,
-          max_tokens: 2500,
-        });
-      } catch (error: any) {
-        if (isRateLimitError(error)) {
-          const rateLimitMessage = getRateLimitMessage(error);
-          console.error("Groq rate limit in agent loop:", rateLimitMessage);
-          finalSummary = "Generation paused due to Groq rate limits. Please retry shortly.";
-          assistantErrorMessage = rateLimitMessage;
-          lastToolResult = { error: "rate_limit", message: rateLimitMessage };
-          break;
+      for (let i = 0; i < MAX_AGENT_STEPS; i++) {
+        let response;
+        try {
+          response = await groq.chat.completions.create({
+            model: GROQ_MODEL,
+            messages: agentMessages,
+            temperature: 0.4,
+            max_tokens: 2500,
+          });
+        } catch (error: any) {
+          if (isRateLimitError(error)) {
+            const rateLimitMessage = getRateLimitMessage(error);
+            console.error("Groq rate limit in agent loop:", rateLimitMessage);
+            finalSummary =
+              "Generation paused due to Groq rate limits. Please retry shortly.";
+            assistantErrorMessage = rateLimitMessage;
+            lastToolResult = { error: "rate_limit", message: rateLimitMessage };
+            break;
+          }
+          throw error;
         }
-        throw error;
-      }
 
-      const raw = response?.choices?.[0]?.message?.content ?? "";
-      lastRaw = raw;
-      console.log("Raw LLM response (truncated):", truncateLog(raw));
+        const raw = response?.choices?.[0]?.message?.content ?? "";
+        lastRaw = raw;
+        console.log("Raw LLM response (truncated):", truncateLog(raw));
 
-      let parsed = parseToolCall(raw);
-      if (!parsed) {
-        console.log("Parsing failed, using fallback page");
-        parsed = createFallbackPage();
-      }
-      lastParsed = parsed;
+        let parsed = parseToolCall(raw);
+        if (!parsed) {
+          console.log("Parsing failed, using fallback page");
+          parsed = createFallbackPage();
+        }
+        lastParsed = parsed;
 
-      let execution;
-      try {
-        execution = await executeToolCall(parsed, sandboxInstance);
-      } catch (error: any) {
-        console.error("Tool execution error:", error);
-        const fallback = createFallbackPage();
-        execution = {
-          tool: "createOrUpdateFiles" as const,
-          result: await createOrUpdateFiles(fallback.args.files, sandboxInstance),
-          error: String(error),
-        };
-      }
+        let execution;
+        try {
+          execution = await executeToolCall(parsed, sandboxInstance);
+        } catch (error: any) {
+          console.error("Tool execution error:", error);
+          const fallback = createFallbackPage();
+          execution = {
+            tool: "createOrUpdateFiles" as const,
+            result: await createOrUpdateFiles(
+              fallback.args.files,
+              sandboxInstance,
+            ),
+            error: String(error),
+          };
+        }
 
-      lastToolResult = execution.result;
+        lastToolResult = execution.result;
 
-      if (execution.tool === "createOrUpdateFiles") {
-        const maybeUpdated = (execution.result as { updated?: string[] }).updated;
-        if (Array.isArray(maybeUpdated)) {
-          for (const filePath of maybeUpdated) {
-            updatedFiles.add(filePath);
+        if (execution.tool === "createOrUpdateFiles") {
+          const maybeUpdated = (execution.result as { updated?: string[] })
+            .updated;
+          if (Array.isArray(maybeUpdated)) {
+            for (const filePath of maybeUpdated) {
+              updatedFiles.add(filePath);
+            }
           }
         }
+
+        if (parsed.tool === "done") {
+          finalSummary = parsed.args.summary;
+          break;
+        }
+
+        agentMessages.push({
+          role: "assistant",
+          content: JSON.stringify(parsed),
+        });
+        agentMessages.push({
+          role: "user",
+          content: `Tool result: ${truncateLog(JSON.stringify(execution.result), 3000)}. Continue with the next tool call or finish with {"tool":"done","args":{"summary":"..."}}.`,
+        });
       }
 
-      if (parsed.tool === "done") {
-        finalSummary = parsed.args.summary;
-        break;
+      if (finalSummary === "Generated code and summary." && lastParsed) {
+        finalSummary = `Generated output using ${lastParsed.tool}.`;
       }
-
-      agentMessages.push({
-        role: "assistant",
-        content: JSON.stringify(parsed),
-      });
-      agentMessages.push({
-        role: "user",
-        content: `Tool result: ${truncateLog(JSON.stringify(execution.result), 3000)}. Continue with the next tool call or finish with {"tool":"done","args":{"summary":"..."}}.`,
-      });
-    }
-
-    if (finalSummary === "Generated code and summary." && lastParsed) {
-      finalSummary = `Generated output using ${lastParsed.tool}.`;
-    }
 
       const host = await sandboxInstance.getHost(3000);
       const sandBoxUrl = `https://${host}`;
@@ -529,7 +545,10 @@ export const codeAgentFunction = inngest.createFunction(
               if (isRateLimitError(error)) {
                 const message = getRateLimitMessage(error);
                 assistantErrorMessage = message;
-                console.error("Groq rate limit in response generation:", message);
+                console.error(
+                  "Groq rate limit in response generation:",
+                  message,
+                );
                 return message;
               }
               console.error("Response generation error:", error);
@@ -567,7 +586,9 @@ export const codeAgentFunction = inngest.createFunction(
             return await prisma.message.create({
               data: {
                 projectId: event.data.projectId,
-                content: assistantErrorMessage || "Something went wrong generating the code.",
+                content:
+                  assistantErrorMessage ||
+                  "Something went wrong generating the code.",
                 role: "ASSISTANT",
                 type: "ERROR",
               },

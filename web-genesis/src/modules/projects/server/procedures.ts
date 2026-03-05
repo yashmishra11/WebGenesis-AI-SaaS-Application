@@ -1,10 +1,10 @@
 import { z } from "zod";
-import prisma from "@/lib/db";
 import { inngest } from "@/inngest/client";
 import { protectedProcedure, createTRPCRouter } from "@/trpc/init";
 import { generateSlug } from "random-word-slugs";
 import { consumeCredits } from "@/lib/usage";
 import { TRPCError } from "@trpc/server";
+import { prisma } from "@/lib/db";
 
 export const projectsRouter = createTRPCRouter({
   getOne: protectedProcedure
@@ -15,7 +15,6 @@ export const projectsRouter = createTRPCRouter({
     )
     .query(async ({ input, ctx }) => {
       // throw new TRPCError({ code: "FORBIDDEN_REQUEST"});
-
 
       const existingProjects = await prisma.project.findUnique({
         where: {

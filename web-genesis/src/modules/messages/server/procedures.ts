@@ -1,17 +1,17 @@
 import { z } from "zod";
-import prisma from "@/lib/db";
 import { inngest } from "@/inngest/client";
 import { protectedProcedure, createTRPCRouter } from "@/trpc/init";
 import { TRPCError } from "@trpc/server";
 import { consumeCredits, getUsageTracker } from "@/lib/usage";
 import { auth } from "@clerk/nextjs/server";
+import { prisma } from "@/lib/db";
 
 export const messagesRouter = createTRPCRouter({
   getMany: protectedProcedure
     .input(
       z.object({
         projectId: z.string().min(1, { message: "Project Id is required" }),
-      })
+      }),
     )
     .query(async ({ input, ctx }) => {
       const messages = await prisma.message.findMany({
@@ -30,66 +30,76 @@ export const messagesRouter = createTRPCRouter({
       });
       return messages;
     }),
- create: protectedProcedure
-  .input(
-    z.object({
-      value: z
-        .string()
-        .min(1, { message: "Value is required" })
-        .max(10000, { message: "Value is too long" }),
-      projectId: z.string().min(1, { message: "Project Id is required" }),
-    })
-  )
-  .mutation(async ({ input, ctx }) => {
-    const existingProject = await prisma.project.findUnique({
-      where: {
-        id: input.projectId,
-        userId: ctx.auth.userId,
-      },
-    });
-
-    if (!existingProject) {
-      throw new TRPCError({
-        code: "NOT_FOUND",
-        message: "Project not found",
+  create: protectedProcedure
+    .input(
+      z.object({
+        value: z
+          .string()
+          .min(1, { message: "Value is required" })
+          .max(10000, { message: "Value is too long" }),
+        projectId: z.string().min(1, { message: "Project Id is required" }),
+      }),
+    )
+    .mutation(async ({ input, ctx }) => {
+      const existingProject = await prisma.project.findUnique({
+        where: {
+          id: input.projectId,
+          userId: ctx.auth.userId,
+        },
       });
-    }
 
-    try {
-      await consumeCredits();
-    } catch (error: any) {
-      console.error("❌ Error consuming credits:", error);
-      
-      if (error.msBeforeNext !== undefined) {
+      if (!existingProject) {
         throw new TRPCError({
-          code: "TOO_MANY_REQUESTS",
-          message: `You have run out of credits. Try again in ${Math.ceil(error.msBeforeNext / 1000 / 60 / 60 / 24)} days.`,
+          code: "NOT_FOUND",
+          message: "Project not found",
         });
       }
-      
-      throw new TRPCError({
-        code: "INTERNAL_SERVER_ERROR",
-        message: error.message || "Failed to consume credits",
+
+      try {
+        await consumeCredits();
+      } catch (error: any) {
+        console.error("❌ Error consuming credits:", error);
+
+        if (error.msBeforeNext !== undefined) {
+          throw new TRPCError({
+            code: "TOO_MANY_REQUESTS",
+            message: `You have run out of credits. Try again in ${Math.ceil(
+              error.msBeforeNext / 1000 / 60 / 60 / 24,
+            )} days.`,
+          });
+        }
+
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: error.message || "Failed to consume credits",
+        });
+      }
+
+      const newMessage = await prisma.message.create({
+        data: {
+          projectId: existingProject.id,
+          content: input.value,
+          role: "USER",
+          type: "RESULT",
+        },
       });
-    }
 
-    const newMessage = await prisma.message.create({
-      data: {
-        projectId: existingProject.id,
-        content: input.value,
-        role: "USER",
-        type: "RESULT",
-      },
-    });
+      await inngest.send({
+        name: "code-agent/run",
+        data: {
+          value: input.value,
+          projectId: input.projectId,
+        },
+      });
 
-    await inngest.send({
-      name: "code-agent/run",
-      data: {
-        value: input.value,
-        projectId: input.projectId,
-      },
-    });
+      await inngest.send({
+        name: "code-agent/run",
+        data: {
+          value: input.value,
+          projectId: input.projectId,
+        },
+      });
 
-    return newMessage;
-  }),
+      return newMessage;
+    }),
 });

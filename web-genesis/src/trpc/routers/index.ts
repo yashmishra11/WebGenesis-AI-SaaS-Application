@@ -1,7 +1,7 @@
 import { usageRouter } from "@/modules/usage/server/procedures";
 import { z } from "zod";
 import { createTRPCRouter } from "../init";
-import { baseProcedure } from "../../trpc/init";
+import { baseProcedure } from "../init";
 import { messagesRouter } from "@/modules/messages/server/procedures";
 import { inngest } from "@/inngest/client";
 import { projectsRouter } from "@/modules/projects/server/procedures";
