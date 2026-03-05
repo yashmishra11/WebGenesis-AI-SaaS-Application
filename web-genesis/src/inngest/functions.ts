@@ -23,6 +23,8 @@ const MAX_FILE_SIZE = 250_000;
 const MAX_TERMINAL_CMD_LENGTH = 160;
 const MAX_RAW_LOG_LENGTH = 500;
 const MAX_AGENT_STEPS = 6;
+const MAX_CONTEXT_FILES = 8;
+const MAX_CONTEXT_FILE_CHARS = 2_000;
 const BLOCKED_SHELL_CHARS = /[|;&`$><]/;
 const ALLOWED_TERMINAL_PREFIXES = ["npm install "];
 
@@ -167,15 +169,48 @@ function truncateLog(value: string, maxLength = MAX_RAW_LOG_LENGTH) {
   return value.length > maxLength ? `${value.slice(0, maxLength)}...` : value;
 }
 
-function escapeForTemplateLiteral(input: string) {
-  return input
-    .replace(/\\/g, "\\\\")
-    .replace(/`/g, "\\`")
-    .replace(/\$\{/g, "\\${");
+function normalizeFragmentFiles(
+  rawFiles: unknown,
+): { path: string; content: string }[] {
+  if (!rawFiles || typeof rawFiles !== "object" || Array.isArray(rawFiles)) {
+    return [];
+  }
+
+  const entries = Object.entries(rawFiles as Record<string, unknown>);
+  const normalized: { path: string; content: string }[] = [];
+
+  for (const [path, content] of entries) {
+    if (!isSafeRelativePath(path)) continue;
+    if (typeof content !== "string") continue;
+    normalized.push({
+      path,
+      content: content.slice(0, MAX_FILE_SIZE),
+    });
+  }
+
+  return normalized.slice(0, MAX_CONTEXT_FILES);
 }
 
-function createFallbackPage(userPrompt: string): CreateOrUpdateFilesCall {
-  const safePrompt = escapeForTemplateLiteral(userPrompt);
+function buildExistingFilesContext(files: { path: string; content: string }[]) {
+  if (!files.length) return "";
+
+  const sections = files.map((file) => {
+    const trimmed =
+      file.content.length > MAX_CONTEXT_FILE_CHARS
+        ? `${file.content.slice(0, MAX_CONTEXT_FILE_CHARS)}\n/* truncated */`
+        : file.content;
+
+    return `FILE: ${file.path}\n${trimmed}`;
+  });
+
+  return [
+    "Existing project files from the most recent generated fragment are provided below.",
+    "When the user asks to improve or change output, treat these files as the current baseline and update them incrementally.",
+    sections.join("\n\n"),
+  ].join("\n\n");
+}
+
+function createFallbackPage(): CreateOrUpdateFilesCall {
   return {
     tool: "createOrUpdateFiles",
     args: {
@@ -195,9 +230,6 @@ export default function Home() {
     <div className="min-h-screen bg-background flex items-center justify-center p-6">
       <div className="w-full max-w-xl border rounded-2xl bg-card p-6 space-y-4">
         <h1 className="text-2xl font-semibold">Generated Page</h1>
-        <p className="text-sm text-muted-foreground break-words">
-          Prompt: ${safePrompt}
-        </p>
         <div className="space-y-3">
           <Input
             value={value}
@@ -261,7 +293,7 @@ async function readFiles(files: string[], sandbox: Sandbox) {
   return out;
 }
 
-async function executeToolCall(parsed: ToolCall, sandbox: Sandbox, userPrompt: string) {
+async function executeToolCall(parsed: ToolCall, sandbox: Sandbox) {
   switch (parsed.tool) {
     case "terminal":
       return {
@@ -284,7 +316,7 @@ async function executeToolCall(parsed: ToolCall, sandbox: Sandbox, userPrompt: s
         result: parsed.args,
       };
     default: {
-      const fallback = createFallbackPage(userPrompt);
+      const fallback = createFallbackPage();
       return {
         tool: "createOrUpdateFiles" as const,
         result: await createOrUpdateFiles(fallback.args.files, sandbox),
@@ -310,6 +342,29 @@ export const codeAgentFunction = inngest.createFunction(
 
       const sandboxInstance = await getSandBox(sandboxId);
 
+      const latestFragmentFiles = await step.run("get-latest-fragment-files", async () => {
+        const latestFragment = await prisma.fragment.findFirst({
+          where: {
+            message: {
+              projectId: event.data.projectId,
+              type: "RESULT",
+            },
+          },
+          orderBy: {
+            createdAt: "desc",
+          },
+          select: {
+            files: true,
+          },
+        });
+
+        return normalizeFragmentFiles(latestFragment?.files);
+      });
+
+      if (latestFragmentFiles.length) {
+        await createOrUpdateFiles(latestFragmentFiles, sandboxInstance);
+      }
+
     const previousMessages = await step.run("get-previous-messages", async () => {
       const messages = await prisma.message.findMany({
         where: {
@@ -334,6 +389,14 @@ export const codeAgentFunction = inngest.createFunction(
 
     const agentMessages: ModelMessage[] = [
       { role: "system", content: PROMPT },
+      ...(latestFragmentFiles.length
+        ? [
+            {
+              role: "system" as const,
+              content: buildExistingFilesContext(latestFragmentFiles),
+            },
+          ]
+        : []),
       ...conversationMessages,
       { role: "user", content: userPrompt },
     ];
@@ -373,16 +436,16 @@ export const codeAgentFunction = inngest.createFunction(
       let parsed = parseToolCall(raw);
       if (!parsed) {
         console.log("Parsing failed, using fallback page");
-        parsed = createFallbackPage(userPrompt);
+        parsed = createFallbackPage();
       }
       lastParsed = parsed;
 
       let execution;
       try {
-        execution = await executeToolCall(parsed, sandboxInstance, userPrompt);
+        execution = await executeToolCall(parsed, sandboxInstance);
       } catch (error: any) {
         console.error("Tool execution error:", error);
-        const fallback = createFallbackPage(userPrompt);
+        const fallback = createFallbackPage();
         execution = {
           tool: "createOrUpdateFiles" as const,
           result: await createOrUpdateFiles(fallback.args.files, sandboxInstance),
