@@ -6,7 +6,8 @@ import { useTRPC } from "@/trpc/client";
 import { MessageLoading } from "./message-loading";
 import { Fragment } from "@prisma/client";
 
-const PENDING_TIMEOUT_MS = 45_000;
+const SLOW_GENERATION_MS = 45_000;
+const PENDING_TIMEOUT_MS = 5 * 60_000;
 
 interface Props {
   projectId: string;
@@ -62,6 +63,8 @@ export const MessagesContainer = ({
   const pendingDuration = isLastMessageFromUser
     ? now - new Date(lastMessage.createdAt).getTime()
     : 0;
+  const isSlow =
+    isLastMessageFromUser && pendingDuration > SLOW_GENERATION_MS;
   const isTimedOut =
     isLastMessageFromUser && pendingDuration > PENDING_TIMEOUT_MS;
   const latestAssistantError = useMemo(
@@ -127,7 +130,9 @@ export const MessagesContainer = ({
               type={msg.type}
             />
           ))}
-          {isLastMessageFromUser && <MessageLoading isTimedOut={isTimedOut} />}
+          {isLastMessageFromUser && (
+            <MessageLoading isSlow={isSlow} isTimedOut={isTimedOut} />
+          )}
 
           <div ref={bottomRef} />
         </div>

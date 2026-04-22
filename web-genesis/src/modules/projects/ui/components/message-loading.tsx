@@ -32,10 +32,14 @@ const ShimmerMessages = () => {
 };
 
 interface MessageLoadingProps {
+  isSlow?: boolean;
   isTimedOut?: boolean;
 }
 
-export const MessageLoading = ({ isTimedOut = false }: MessageLoadingProps) => {
+export const MessageLoading = ({
+  isSlow = false,
+  isTimedOut = false,
+}: MessageLoadingProps) => {
   return (
     <div className="flex flex-col group px-2 pb-4">
       <div className="flex items-center gap-2 pl-2 mb-2">
@@ -52,8 +56,15 @@ export const MessageLoading = ({ isTimedOut = false }: MessageLoadingProps) => {
         {isTimedOut ? (
           <div className="flex items-center gap-2 bg-red-100 p-4 rounded">
             <span className="text-sm text-destructive">
-              Generation timed out. Please retry. If the issue persists, check
-              the latest error message above.
+              Generation is taking too long and may have stalled. Please retry.
+              If the issue persists, check the latest error message above.
+            </span>
+          </div>
+        ) : isSlow ? (
+          <div className="flex items-center gap-2 bg-amber-100 p-4 rounded">
+            <span className="text-sm text-amber-900">
+              Generation is taking longer than usual, but it may still finish.
+              Please wait a bit longer.
             </span>
           </div>
         ) : (
