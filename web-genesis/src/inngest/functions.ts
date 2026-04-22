@@ -6,6 +6,7 @@ import Groq from "groq-sdk";
 import { SANDBOX_TIMEOUT } from "./types";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
+import { env } from "@/env";
 
 interface AgentState {
   summary: string;
@@ -75,7 +76,7 @@ type ToolCall = z.infer<typeof toolCallSchema>;
 type CreateOrUpdateFilesCall = z.infer<typeof createOrUpdateFilesSchema>;
 
 const groq = new Groq({
-  apiKey: process.env.GROQ_API_KEY,
+  apiKey: env.GROQ_API_KEY,
 });
 
 function isRateLimitError(error: any) {

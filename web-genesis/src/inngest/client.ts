@@ -1,9 +1,10 @@
 import { Inngest } from "inngest";
+import { env } from "@/env";
 
-const eventKey = process.env.INNGEST_EVENT_KEY;
-const signingKey = process.env.INNGEST_SIGNING_KEY;
+const eventKey = env.INNGEST_EVENT_KEY;
+const signingKey = env.INNGEST_SIGNING_KEY;
 const isDev =
-  process.env.INNGEST_DEV === "1" || process.env.INNGEST_DEV === "true";
+  env.INNGEST_DEV === "1" || env.INNGEST_DEV === "true";
 
 // Create a client to send and receive events
 export const inngest = new Inngest({
@@ -14,7 +15,7 @@ export const inngest = new Inngest({
 });
 
 export function assertInngestCanSendEvents() {
-  if (process.env.NODE_ENV !== "production") {
+  if (env.NODE_ENV !== "production") {
     return;
   }
 
