@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { inngest } from "@/inngest/client";
+import { assertInngestCanSendEvents, inngest } from "@/inngest/client";
 import { protectedProcedure, createTRPCRouter } from "@/trpc/init";
 import { generateSlug } from "random-word-slugs";
 import { consumeCredits } from "@/lib/usage";
@@ -89,13 +89,23 @@ export const projectsRouter = createTRPCRouter({
         },
       });
 
-      await inngest.send({
-        name: "code-agent/run",
-        data: {
-          value: input.value,
-          projectId: createProject.id,
-        },
-      });
+      try {
+        assertInngestCanSendEvents();
+        await inngest.send({
+          name: "code-agent/run",
+          data: {
+            value: input.value,
+            projectId: createProject.id,
+          },
+        });
+      } catch (error) {
+        console.error("Failed to send Inngest event:", error);
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message:
+            "Inngest is not configured on the server. Add INNGEST_EVENT_KEY in Vercel and redeploy.",
+        });
+      }
 
       return createProject;
     }),
