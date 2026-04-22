@@ -2,8 +2,7 @@ import { z } from "zod";
 import { inngest } from "@/inngest/client";
 import { protectedProcedure, createTRPCRouter } from "@/trpc/init";
 import { TRPCError } from "@trpc/server";
-import { consumeCredits, getUsageTracker } from "@/lib/usage";
-import { auth } from "@clerk/nextjs/server";
+import { consumeCredits } from "@/lib/usage";
 import { prisma } from "@/lib/db";
 
 export const messagesRouter = createTRPCRouter({
@@ -81,14 +80,6 @@ export const messagesRouter = createTRPCRouter({
           content: input.value,
           role: "USER",
           type: "RESULT",
-        },
-      });
-
-      await inngest.send({
-        name: "code-agent/run",
-        data: {
-          value: input.value,
-          projectId: input.projectId,
         },
       });
 

@@ -118,34 +118,93 @@ async function callGroq(systemPrompt: string, userPrompt: string) {
   return response.choices[0].message.content || "";
 }
 
-function extractJSONBlock(text: string): unknown | null {
-  const start = text.indexOf("{");
-  if (start === -1) return null;
+function extractFirstJSONObject(text: string): string | null {
+  let start = -1;
   let depth = 0;
-  for (let i = start; i < text.length; i++) {
+  let inString = false;
+  let escaping = false;
+
+  for (let i = 0; i < text.length; i++) {
     const ch = text[i];
-    if (ch === "{") depth++;
-    else if (ch === "}") {
+
+    if (start === -1) {
+      if (ch === "{") {
+        start = i;
+        depth = 1;
+      }
+      continue;
+    }
+
+    if (escaping) {
+      escaping = false;
+      continue;
+    }
+
+    if (ch === "\\") {
+      escaping = true;
+      continue;
+    }
+
+    if (ch === '"') {
+      inString = !inString;
+      continue;
+    }
+
+    if (inString) {
+      continue;
+    }
+
+    if (ch === "{") {
+      depth++;
+      continue;
+    }
+
+    if (ch === "}") {
       depth--;
       if (depth === 0) {
-        const candidate = text.slice(start, i + 1);
-        try {
-          return JSON.parse(candidate);
-        } catch {
-          return null;
-        }
+        return text.slice(start, i + 1);
       }
     }
   }
+
   return null;
 }
 
-function parseToolCall(rawText: string): ToolCall | null {
-  const extracted = extractJSONBlock(rawText);
-  if (!extracted) return null;
+function getJSONCandidates(rawText: string) {
+  const candidates: string[] = [];
+  const trimmed = rawText.trim();
 
-  const parsed = toolCallSchema.safeParse(extracted);
-  return parsed.success ? parsed.data : null;
+  const fencedMatch = trimmed.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/i);
+  if (fencedMatch?.[1]) {
+    candidates.push(fencedMatch[1].trim());
+  }
+
+  if (trimmed.startsWith("{") && trimmed.endsWith("}")) {
+    candidates.push(trimmed);
+  }
+
+  const embeddedObject = extractFirstJSONObject(rawText);
+  if (embeddedObject) {
+    candidates.push(embeddedObject);
+  }
+
+  return [...new Set(candidates)];
+}
+
+function parseToolCall(rawText: string): ToolCall | null {
+  for (const candidate of getJSONCandidates(rawText)) {
+    try {
+      const extracted = JSON.parse(candidate);
+      const parsed = toolCallSchema.safeParse(extracted);
+      if (parsed.success) {
+        return parsed.data;
+      }
+    } catch {
+      continue;
+    }
+  }
+
+  return null;
 }
 
 function isSafeRelativePath(path: string) {

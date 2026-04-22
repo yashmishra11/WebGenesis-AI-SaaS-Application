@@ -7,9 +7,9 @@ import { Suspense } from "react";
 export default async function Page({
   params,
 }: {
-  params: { projectId: string };
+  params: Promise<{ projectId: string }>;
 }) {
-  const { projectId } = params;
+  const { projectId } = await params;
 
   const queryClient = getQueryClient();
 
