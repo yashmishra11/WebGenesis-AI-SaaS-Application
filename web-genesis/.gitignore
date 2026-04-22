@@ -2,7 +2,6 @@
 
 # dependencies
 /node_modules
-prisma/migrations/
 /.pnp
 .pnp.*
 .yarn/*
