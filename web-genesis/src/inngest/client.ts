@@ -2,10 +2,13 @@ import { Inngest } from "inngest";
 
 const eventKey = process.env.INNGEST_EVENT_KEY;
 const signingKey = process.env.INNGEST_SIGNING_KEY;
+const isDev =
+  process.env.INNGEST_DEV === "1" || process.env.INNGEST_DEV === "true";
 
 // Create a client to send and receive events
 export const inngest = new Inngest({
   id: "webgenesis-ai",
+  ...(isDev ? { isDev: true } : {}),
   ...(eventKey ? { eventKey } : {}),
   ...(signingKey ? { signingKey } : {}),
 });
