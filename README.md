@@ -2,7 +2,7 @@
 
 WebGenesis is an innovative AI-powered Software-as-a-Service (SaaS) platform designed to help businesses and developers streamline the creation, deployment, and management of intelligent web applications. Built on modern cloud architecture, WebGenesis provides scalable AI tools and APIs for automation.
 
-## 🚀 Features
+## Features
 
 - **AI-Powered Development**: Leverage advanced AI models to automate web application development
 - **Intelligent Deployment**: Smart deployment pipelines with automated optimization
@@ -11,7 +11,7 @@ WebGenesis is an innovative AI-powered Software-as-a-Service (SaaS) platform des
 - **Real-time Management**: Monitor and manage your applications in real-time
 - **Automated Workflows**: Streamline your development process with intelligent automation
 
-## 📸 Screenshots
+## Screenshots
 
 ### Homepage
 ![Homepage](./images/homepage.jpeg)
@@ -25,7 +25,7 @@ WebGenesis is an innovative AI-powered Software-as-a-Service (SaaS) platform des
 ![Working Flowchart](./images/working_flowchart.png)
 *Complete workflow architecture and process flow*
 
-## 🛠️ Tech Stack
+## Tech Stack
 
 - **Frontend**: [Your frontend framework]
 - **Backend**: [Your backend technology]
@@ -34,7 +34,7 @@ WebGenesis is an innovative AI-powered Software-as-a-Service (SaaS) platform des
 - **Cloud**: [Cloud platform]
 - **APIs**: RESTful/GraphQL
 
-## 📦 Installation
+## Installation
 
 ```bash
 # Clone the repository
@@ -53,7 +53,7 @@ cp .env.example .env
 npm start
 ```
 
-## 🔧 Configuration
+## Configuration
 
 Create a `.env` file in the root directory with the following variables:
 
@@ -63,7 +63,7 @@ E2B_API_KEY=e2b_db3fb7c34f6f1f5aad88ec88a7d87a4dd45f247d
 DATABASE_URL='postgresql://neondb_owner:npg_pvH8BQcD5GhT@ep-jolly-grass-ad1aedu0-pooler.c-2.us-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require'
 ```
 
-## 💻 Usage
+## Usage
 
 ```javascript
 // Example usage of WebGenesis API
@@ -80,14 +80,14 @@ await app.create({
 });
 ```
 
-## 🌟 Key Benefits
+## Key Benefits
 
 - **Faster Time to Market**: Deploy intelligent applications in minutes, not months
 - **Cost-Effective**: Reduce development costs with AI automation
 - **Scalable Solutions**: Grow from startup to enterprise with ease
 - **Developer Experience**: Intuitive tools designed for modern development workflows
 
-## 🤝 Contributing
+## Contributing
 
 Contributions are welcome! Please follow these steps:
 
@@ -97,11 +97,11 @@ Contributions are welcome! Please follow these steps:
 4. Push to the branch (`git push origin feature/amazing-feature`)
 5. Open a Pull Request
 
-## 📄 License
+## License
 
 This project is licensed under the [JAAFR](LICENSE)
 
-## 👥 Team
+## Team
 
 - **Yash** - [@yashmishra11](https://github.com/yashmishra11)
 - **Shan** - [@Mohdshan09](https://github.com/Mohdshan09)
@@ -109,5 +109,5 @@ This project is licensed under the [JAAFR](LICENSE)
 
 ---
 
-**⭐ If you find this project useful, please consider giving it a star!**
-https://web-genesis-ai-saa-s-application.vercel.app/sign-in?redirect_url=https%3A%2F%2Fweb-genesis-ai-saa-s-application.vercel.app%2F
+** If you find this project useful, please consider giving it a star!**
+(https://webgenesis09.vercel.app)
