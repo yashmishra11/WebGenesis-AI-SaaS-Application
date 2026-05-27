@@ -5,8 +5,8 @@ import { z } from "zod";
 const serverEnvSchema = z.object({
   DATABASE_URL: z.url(),
   CLERK_SECRET_KEY: z.string().min(1),
-  INNGEST_EVENT_KEY: z.string().min(1),
-  INNGEST_SIGNING_KEY: z.string().min(1),
+  INNGEST_EVENT_KEY: z.string().min(1).optional(),
+  INNGEST_SIGNING_KEY: z.string().min(1).optional(),
   GROQ_API_KEY: z.string().min(1),
   E2B_API_KEY: z.string().min(1),
   NEXT_PUBLIC_APP_URL: z.url(),
