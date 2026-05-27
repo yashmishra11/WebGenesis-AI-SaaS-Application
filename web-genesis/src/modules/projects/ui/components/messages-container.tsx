@@ -1,10 +1,12 @@
-import { useSuspenseQuery } from "@tanstack/react-query";
+import { useSuspenseQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Messagecard } from "./message-card";
 import { Messageform } from "./message.form";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTRPC } from "@/trpc/client";
 import { MessageLoading } from "./message-loading";
 import { Fragment } from "@prisma/client";
+import { Button } from "@/components/ui/button";
+import { Loader2Icon, SquareIcon } from "lucide-react";
 
 const SLOW_GENERATION_MS = 45_000;
 const PENDING_TIMEOUT_MS = 5 * 60_000;
@@ -21,11 +23,23 @@ export const MessagesContainer = ({
   setActiveFragment,
 }: Props) => {
   const trpc = useTRPC();
+  const queryClient = useQueryClient();
   const bottomRef = useRef<HTMLDivElement>(null);
   const lastMessageIdRef = useRef<string | null>(null);
   const statusMessageRef = useRef<string | null>(null);
   const [now, setNow] = useState(Date.now());
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
+
+  const cancelGeneration = useMutation(
+    trpc.projects.cancel.mutationOptions({
+      onSuccess: () => {
+        queryClient.invalidateQueries(
+          trpc.messages.getMany.queryOptions({ projectId })
+        );
+        queryClient.invalidateQueries(trpc.usage.status.queryOptions());
+      },
+    })
+  );
   const { data: messages } = useSuspenseQuery(
     trpc.messages.getMany.queryOptions(
       {
@@ -139,7 +153,25 @@ export const MessagesContainer = ({
       </div>
       {/* Message Form */}
       <div className="relative p-3 pt-1 ">
-        <div className="absolute -top-6 left-0 right-0 h-6 bg-gradient-to-b from-transparent to-background/70 pointer-events-none" />{" "}
+        <div className="absolute -top-6 left-0 right-0 h-6 bg-gradient-to-b from-transparent to-background/70 pointer-events-none" />
+        {isLastMessageFromUser && (
+          <div className="flex justify-center mb-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => cancelGeneration.mutate({ projectId })}
+              disabled={cancelGeneration.isPending}
+              className="gap-1.5 text-muted-foreground hover:text-foreground"
+            >
+              {cancelGeneration.isPending ? (
+                <Loader2Icon className="size-3.5 animate-spin" />
+              ) : (
+                <SquareIcon className="size-3.5 fill-current" />
+              )}
+              {cancelGeneration.isPending ? "Stopping..." : "Stop generation"}
+            </Button>
+          </div>
+        )}
         <Messageform projectId={projectId} />
       </div>
     </div>

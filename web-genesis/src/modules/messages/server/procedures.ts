@@ -1,31 +1,34 @@
 import { z } from "zod";
 import { assertInngestCanSendEvents, inngest } from "@/inngest/client";
-import { protectedProcedure, createTRPCRouter } from "@/trpc/init";
+import { baseProcedure, protectedProcedure, createTRPCRouter } from "@/trpc/init";
 import { TRPCError } from "@trpc/server";
 import { consumeCredits } from "@/lib/usage";
 import { prisma } from "@/lib/db";
 
 export const messagesRouter = createTRPCRouter({
-  getMany: protectedProcedure
+  getMany: baseProcedure
     .input(
       z.object({
         projectId: z.string().min(1, { message: "Project Id is required" }),
       }),
     )
     .query(async ({ input, ctx }) => {
+      const userId = ctx.auth.userId;
+      const guestId = ctx.guestId;
+
+      if (!userId && !guestId) {
+        throw new TRPCError({ code: "UNAUTHORIZED", message: "Not authenticated" });
+      }
+
+      const userIdFilter = userId ?? `guest_${guestId}`;
+
       const messages = await prisma.message.findMany({
         where: {
           projectId: input.projectId,
-          project: {
-            userId: ctx.auth.userId,
-          },
+          project: { userId: userIdFilter },
         },
-        orderBy: {
-          createdAt: "asc",
-        },
-        include: {
-          fragment: true,
-        },
+        orderBy: { createdAt: "asc" },
+        include: { fragment: true },
       });
       return messages;
     }),

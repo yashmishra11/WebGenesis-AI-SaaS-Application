@@ -13,7 +13,8 @@ import { useTRPC } from "@/trpc/client";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { PROJECT_TEMPLATES } from "../../constants/constant";
-import { useClerk } from "@clerk/nextjs";
+import { useClerk, useUser } from "@clerk/nextjs";
+import { AuthGateModal } from "./auth-gate-modal";
 
 const formSchema = z.object({
   value: z
@@ -27,46 +28,55 @@ export const ProjectForm = () => {
   const trpc = useTRPC();
   const router = useRouter();
   const clerk = useClerk();
+  const { isSignedIn } = useUser();
 
   const [isFocused, setFocused] = useState(false);
+  const [showAuthGate, setShowAuthGate] = useState(false);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
-    defaultValues: {
-      value: "",
-    },
+    defaultValues: { value: "" },
   });
 
   const createProject = useMutation(
     trpc.projects.create.mutationOptions({
       onSuccess: (data) => {
         queryClient.invalidateQueries(trpc.projects.getMany.queryOptions());
-
         queryClient.invalidateQueries(trpc.usage.status.queryOptions());
-
         router.push(`/projects/${data.id}`);
       },
-
       onError: (error) => {
         toast.error(error.message);
+        if (error?.data?.code === "UNAUTHORIZED") clerk.openSignIn();
+        if (error.data?.code === "TOO_MANY_REQUESTS") router.push("/pricing");
+      },
+    })
+  );
 
-        if (error?.data?.code === "UNAUTHORIZED") {
-          clerk.openSignIn();
-        }
-
+  const createGuestProject = useMutation(
+    trpc.projects.createAsGuest.mutationOptions({
+      onSuccess: (data) => {
+        router.push(`/projects/${data.id}`);
+      },
+      onError: (error) => {
         if (error.data?.code === "TOO_MANY_REQUESTS") {
-          router.push("/pricing");
+          setShowAuthGate(true);
+        } else {
+          toast.error(error.message);
         }
       },
     })
   );
-  const isPending = createProject.isPending;
+
+  const isPending = createProject.isPending || createGuestProject.isPending;
   const isButtonDisabled = isPending || !form.formState.isValid;
 
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
-    await createProject.mutateAsync({
-      value: values.value,
-    });
+    if (isSignedIn) {
+      await createProject.mutateAsync({ value: values.value });
+    } else {
+      await createGuestProject.mutateAsync({ value: values.value });
+    }
   };
 
   const onSelect = (content: string) => {
@@ -78,78 +88,79 @@ export const ProjectForm = () => {
   };
 
   return (
-    <Form {...form}>
-      <section className="space-y-6">
-        <form
-          className={cn(
-            "relative border p-4 pt-1 rounded-xl bg-sidebar dark:bg-sidebar transition-all ",
-            isFocused && "shadow-xs "
-          )}
-          onSubmit={form.handleSubmit(onSubmit)}
-          action=""
-        >
-          <FormField
-            control={form.control}
-            name="value"
-            render={({ field }) => (
-              <TextareaAutosize
-                disabled={isPending}
-                {...field}
-                onFocus={() => setFocused(true)}
-                onBlur={() => setFocused(false)}
-                minRows={2}
-                maxRows={8}
-                className="pt-4 resize-none border-none w-full outline-none bg-transparent "
-                placeholder="What would you like to build"
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
-                    e.preventDefault();
-                    form.handleSubmit(onSubmit)(e);
-                  }
-                }}
-              />
+    <>
+      <AuthGateModal open={showAuthGate} onClose={() => setShowAuthGate(false)} />
+      <Form {...form}>
+        <section className="space-y-6">
+          <form
+            className={cn(
+              "relative border p-4 pt-1 rounded-xl bg-sidebar dark:bg-sidebar transition-all ",
+              isFocused && "shadow-xs "
             )}
-          />
+            onSubmit={form.handleSubmit(onSubmit)}
+            action=""
+          >
+            <FormField
+              control={form.control}
+              name="value"
+              render={({ field }) => (
+                <TextareaAutosize
+                  disabled={isPending}
+                  {...field}
+                  onFocus={() => setFocused(true)}
+                  onBlur={() => setFocused(false)}
+                  minRows={2}
+                  maxRows={8}
+                  className="pt-4 resize-none border-none w-full outline-none bg-transparent "
+                  placeholder="What would you like to build"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+                      e.preventDefault();
+                      form.handleSubmit(onSubmit)(e);
+                    }
+                  }}
+                />
+              )}
+            />
 
-          <div className="flex gap-x-2 items-end justify-between pt-2">
-            <div className="text-[10px] text-muted-foreground font-mono">
-              <kbd className="ml-auto pointer-events-auto inline-flex h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground">
-                <span>&#8984;</span>Enter
-              </kbd>
-              &nbsp; to submit
+            <div className="flex gap-x-2 items-end justify-between pt-2">
+              <div className="text-[10px] text-muted-foreground font-mono">
+                <kbd className="ml-auto pointer-events-auto inline-flex h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground">
+                  <span>&#8984;</span>Enter
+                </kbd>
+                &nbsp; to submit
+              </div>
+              <Button
+                disabled={isButtonDisabled}
+                className={cn(
+                  "size-8 rounded-full",
+                  isButtonDisabled && "bg-muted-foreground border "
+                )}
+              >
+                {isPending ? (
+                  <Loader2Icon className="size-4 animate-spin" />
+                ) : (
+                  <ArrowUpIcon />
+                )}
+              </Button>
             </div>
-            <Button
-              disabled={isButtonDisabled}
-              className={cn(
-                "size-8 rounded-full",
-                isButtonDisabled && "bg-muted-foreground border "
-              )}
-            >
-              {isPending ? (
-                <Loader2Icon className="size-4 animate-spin" />
-              ) : (
-                <ArrowUpIcon />
-              )}
-            </Button>
-          </div>
-        </form>
+          </form>
 
-        <div className="flex-wrap justify-center gap-2 hidden md:flex max-w-3xl">
-          {PROJECT_TEMPLATES.map((template) => (
-            <Button
-              variant={"outline"}
-              size="sm"
-              className="bg-white dark:bg-sidebar"
-              key={template.title}
-              onClick={() => {
-                onSelect(template.prompt);
-              }}
-            >
-              {template.emoji} {template.title}
-            </Button>
-          ))}
-        </div>
-      </section>
-    </Form>
+          <div className="flex-wrap justify-center gap-2 hidden md:flex max-w-3xl">
+            {PROJECT_TEMPLATES.map((template) => (
+              <Button
+                variant={"outline"}
+                size="sm"
+                className="bg-white dark:bg-sidebar"
+                key={template.title}
+                onClick={() => onSelect(template.prompt)}
+              >
+                {template.emoji} {template.title}
+              </Button>
+            ))}
+          </div>
+        </section>
+      </Form>
+    </>
   );
 };

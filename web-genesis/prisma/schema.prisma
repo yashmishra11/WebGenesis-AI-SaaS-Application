@@ -34,6 +34,7 @@ model Project {
   id        String    @id @default(cuid())
   name      String
   userId    String    @default("default-user-id")
+  cancelled Boolean   @default(false)
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   messages  Message[]

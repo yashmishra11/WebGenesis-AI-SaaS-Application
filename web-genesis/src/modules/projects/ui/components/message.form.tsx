@@ -12,6 +12,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTRPC } from "@/trpc/client";
 import { toast } from "sonner";
 import { Usage } from "./usage";
+import { useClerk } from "@clerk/nextjs";
 
 interface Props {
   projectId: string;
@@ -27,7 +28,8 @@ const formSchema = z.object({
 export const Messageform = ({ projectId }: Props) => {
   const queryClient = useQueryClient();
   const trpc = useTRPC();
-const router = useRouter();
+  const router = useRouter();
+  const clerk = useClerk();
 
   const { data: usage } = useQuery(trpc.usage.status.queryOptions());
 
@@ -56,9 +58,12 @@ const router = useRouter();
       },
 
       onError: (error) => {
+        if (error?.data?.code === "UNAUTHORIZED") {
+          clerk.openSignIn();
+          return;
+        }
         toast.error(error.message);
-
-        if(error.data?.code === "TOO_MANY_REQUESTS") {
+        if (error.data?.code === "TOO_MANY_REQUESTS") {
           router.push("/pricing");
         }
       },

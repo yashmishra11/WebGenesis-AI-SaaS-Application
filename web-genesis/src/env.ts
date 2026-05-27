@@ -8,6 +8,13 @@ const serverEnvSchema = z.object({
   INNGEST_EVENT_KEY: z.string().min(1).optional(),
   INNGEST_SIGNING_KEY: z.string().min(1).optional(),
   GROQ_API_KEY: z.string().min(1),
+  GROQ_MODEL: z.string().min(1).optional(),
+  OPENROUTER_API_KEY: z.string().min(1).optional(),
+  OPENROUTER_MODEL: z.string().min(1).optional(),
+  GEMINI_API_KEY: z.string().min(1).optional(),
+  GEMINI_MODEL: z.string().min(1).optional(),
+  OPENAI_API_KEY: z.string().min(1).optional(),
+  OPENAI_MODEL: z.string().min(1).optional(),
   E2B_API_KEY: z.string().min(1),
   NEXT_PUBLIC_APP_URL: z.url(),
   NODE_ENV: z

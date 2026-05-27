@@ -2,10 +2,14 @@ import { auth } from "@clerk/nextjs/server";
 import { initTRPC, TRPCError } from "@trpc/server";
 import { cache } from "react";
 import superjson from "superjson";
+import { cookies } from "next/headers";
 
 export const createTRPCContext = cache(async () => {
+  const cookieStore = await cookies();
+  const guestId = cookieStore.get("wg_guest_id")?.value ?? null;
   return {
     auth: await auth(),
+    guestId,
   };
 });
 

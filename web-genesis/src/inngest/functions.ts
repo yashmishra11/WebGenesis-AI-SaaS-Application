@@ -3,6 +3,8 @@ import { Sandbox } from "@e2b/code-interpreter";
 import { getSandBox } from "./utils";
 import { FRAGMENT_TITLE_PROMPT, PROMPT, RESPONSE_PROMPT } from "./prompt";
 import Groq from "groq-sdk";
+import OpenAI from "openai";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 import { SANDBOX_TIMEOUT } from "./types";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
@@ -18,7 +20,22 @@ type ModelMessage = {
   content: string;
 };
 
-const GROQ_MODEL = "llama-3.3-70b-versatile";
+const GROQ_MODEL = env.GROQ_MODEL ?? "llama-3.3-70b-versatile";
+const DEFAULT_OPENROUTER_MODELS = [
+  "meta-llama/llama-3.3-70b-instruct:free",
+  "z-ai/glm-4.5-air:free",
+  "openai/gpt-oss-20b:free",
+];
+const OPENROUTER_MODELS = env.OPENROUTER_MODEL
+  ? [
+      env.OPENROUTER_MODEL,
+      ...DEFAULT_OPENROUTER_MODELS.filter(
+        (model) => model !== env.OPENROUTER_MODEL,
+      ),
+    ]
+  : DEFAULT_OPENROUTER_MODELS;
+const GEMINI_MODEL = env.GEMINI_MODEL ?? "gemini-2.0-flash";
+const OPENAI_MODEL = env.OPENAI_MODEL ?? "gpt-4o-mini";
 const MAX_FILES_PER_WRITE = 25;
 const MAX_FILE_SIZE = 250_000;
 const MAX_TERMINAL_CMD_LENGTH = 160;
@@ -79,6 +96,27 @@ const groq = new Groq({
   apiKey: env.GROQ_API_KEY,
 });
 
+const openrouter = env.OPENROUTER_API_KEY
+  ? new OpenAI({
+      baseURL: "https://openrouter.ai/api/v1",
+      apiKey: env.OPENROUTER_API_KEY,
+      defaultHeaders: {
+        "HTTP-Referer": env.NEXT_PUBLIC_APP_URL,
+        "X-Title": "WebGenesis",
+      },
+    })
+  : null;
+
+const gemini = env.GEMINI_API_KEY
+  ? new GoogleGenerativeAI(env.GEMINI_API_KEY)
+  : null;
+
+const openai = env.OPENAI_API_KEY
+  ? new OpenAI({
+      apiKey: env.OPENAI_API_KEY,
+    })
+  : null;
+
 function isRateLimitError(error: any) {
   return (
     error?.status === 429 ||
@@ -105,18 +143,108 @@ function getSafeErrorMessage(error: unknown) {
   return raw.slice(0, 1500);
 }
 
-async function callGroq(systemPrompt: string, userPrompt: string) {
-  const response = await groq.chat.completions.create({
-    model: GROQ_MODEL,
-    messages: [
-      { role: "system", content: systemPrompt },
-      { role: "user", content: userPrompt },
-    ],
-    temperature: 0.7,
-    max_tokens: 4000,
-  });
+function getProviderErrorMessage(error: unknown) {
+  const status =
+    typeof error === "object" && error !== null && "status" in error
+      ? String((error as { status?: unknown }).status)
+      : "";
+  return [status, getSafeErrorMessage(error)].filter(Boolean).join(" ");
+}
 
-  return response.choices[0].message.content || "";
+function toGeminiPrompt(messages: ModelMessage[]) {
+  return messages
+    .map((message) => `${message.role.toUpperCase()}:\n${message.content}`)
+    .join("\n\n");
+}
+
+async function callLLMWithFallbacks(
+  messages: ModelMessage[],
+  options: { temperature?: number; max_tokens?: number } = {},
+): Promise<string> {
+  const { temperature = 0.7, max_tokens = 4000 } = options;
+  const failures: string[] = [];
+
+  try {
+    const response = await groq.chat.completions.create({
+      model: GROQ_MODEL,
+      messages,
+      temperature,
+      max_tokens,
+    });
+    return response.choices[0].message.content || "";
+  } catch (error) {
+    const detail = getProviderErrorMessage(error);
+    failures.push(`Groq (${GROQ_MODEL}): ${detail}`);
+    console.warn(`[LLM] Groq (${GROQ_MODEL}) failed → ${detail}`);
+  }
+
+  if (openrouter) {
+    for (const model of OPENROUTER_MODELS) {
+      try {
+        const response = await openrouter.chat.completions.create({
+          model,
+          messages,
+          temperature,
+          max_tokens,
+        });
+        return response.choices[0].message.content || "";
+      } catch (error) {
+        const detail = getProviderErrorMessage(error);
+        failures.push(`OpenRouter (${model}): ${detail}`);
+        console.warn(`[LLM] OpenRouter (${model}) failed → ${detail}`);
+      }
+    }
+  }
+
+  if (gemini) {
+    try {
+      const model = gemini.getGenerativeModel({
+        model: GEMINI_MODEL,
+        generationConfig: {
+          temperature,
+          maxOutputTokens: max_tokens,
+        },
+      });
+      const response = await model.generateContent(toGeminiPrompt(messages));
+      return response.response.text();
+    } catch (error) {
+      const detail = getProviderErrorMessage(error);
+      failures.push(`Gemini (${GEMINI_MODEL}): ${detail}`);
+      console.warn(`[LLM] Gemini (${GEMINI_MODEL}) failed → ${detail}`);
+    }
+  }
+
+  if (openai) {
+    try {
+      const response = await openai.chat.completions.create({
+        model: OPENAI_MODEL,
+        messages,
+        temperature,
+        max_tokens,
+      });
+      return response.choices[0].message.content || "";
+    } catch (error) {
+      const detail = getProviderErrorMessage(error);
+      failures.push(`OpenAI (${OPENAI_MODEL}): ${detail}`);
+      console.warn(`[LLM] OpenAI (${OPENAI_MODEL}) failed → ${detail}`);
+    }
+  }
+
+  const error = new Error(
+    `All configured AI providers failed. ${failures.join(" | ")}`,
+  );
+  (error as { status?: number }).status = 429;
+  throw error;
+}
+
+async function callLLMSimple(
+  systemPrompt: string,
+  userPrompt: string,
+): Promise<string> {
+  return callLLMWithFallbacks([
+    { role: "system", content: systemPrompt },
+    { role: "user", content: userPrompt },
+  ]);
 }
 
 function extractFirstJSONObject(text: string): string | null {
@@ -458,6 +586,15 @@ export const codeAgentFunction = inngest.createFunction(
         }),
       );
 
+      // The procedure stores the USER message before sending the event, so the
+      // current prompt is already at the end of conversationMessages. Avoid
+      // duplicating it. Fall back to appending if history is empty (e.g. race).
+      const lastConvMessage =
+        conversationMessages[conversationMessages.length - 1];
+      const promptAlreadyPresent =
+        lastConvMessage?.role === "user" &&
+        lastConvMessage?.content === userPrompt;
+
       const agentMessages: ModelMessage[] = [
         { role: "system", content: PROMPT },
         ...(latestFragmentFiles.length
@@ -469,7 +606,9 @@ export const codeAgentFunction = inngest.createFunction(
             ]
           : []),
         ...conversationMessages,
-        { role: "user", content: userPrompt },
+        ...(promptAlreadyPresent
+          ? []
+          : [{ role: "user" as const, content: userPrompt }]),
       ];
 
       let lastRaw = "";
@@ -480,28 +619,33 @@ export const codeAgentFunction = inngest.createFunction(
       let assistantErrorMessage: string | null = null;
 
       for (let i = 0; i < MAX_AGENT_STEPS; i++) {
-        let response;
+        const projectState = await prisma.project.findUnique({
+          where: { id: projectId },
+          select: { cancelled: true },
+        });
+        if (projectState?.cancelled) {
+          finalSummary = "Generation was stopped.";
+          break;
+        }
+
+        let raw: string;
         try {
-          response = await groq.chat.completions.create({
-            model: GROQ_MODEL,
-            messages: agentMessages,
+          raw = await callLLMWithFallbacks(agentMessages, {
             temperature: 0.4,
             max_tokens: 2500,
           });
         } catch (error: any) {
           if (isRateLimitError(error)) {
             const rateLimitMessage = getRateLimitMessage(error);
-            console.error("Groq rate limit in agent loop:", rateLimitMessage);
+            console.error("Rate limit on all providers:", rateLimitMessage);
             finalSummary =
-              "Generation paused due to Groq rate limits. Please retry shortly.";
+              "Generation paused — all providers are rate limited. Please retry shortly.";
             assistantErrorMessage = rateLimitMessage;
             lastToolResult = { error: "rate_limit", message: rateLimitMessage };
             break;
           }
           throw error;
         }
-
-        const raw = response?.choices?.[0]?.message?.content ?? "";
         lastRaw = raw;
         console.log("Raw LLM response (truncated):", truncateLog(raw));
 
@@ -583,14 +727,11 @@ export const codeAgentFunction = inngest.createFunction(
         ? "Generation Error"
         : await step.run("generate-fragment-title", async () => {
             try {
-              return await callGroq(FRAGMENT_TITLE_PROMPT, agentState.summary);
+              return await callLLMSimple(
+                FRAGMENT_TITLE_PROMPT,
+                agentState.summary,
+              );
             } catch (error: any) {
-              if (isRateLimitError(error)) {
-                const message = getRateLimitMessage(error);
-                assistantErrorMessage = message;
-                console.error("Groq rate limit in fragment title:", message);
-                return "Generation Error";
-              }
               console.error("Fragment title generation error:", error);
               return "Generated Page";
             }
@@ -600,23 +741,20 @@ export const codeAgentFunction = inngest.createFunction(
         ? assistantErrorMessage
         : await step.run("generate-response", async () => {
             try {
-              return await callGroq(RESPONSE_PROMPT, agentState.summary);
+              return await callLLMSimple(RESPONSE_PROMPT, agentState.summary);
             } catch (error: any) {
-              if (isRateLimitError(error)) {
-                const message = getRateLimitMessage(error);
-                assistantErrorMessage = message;
-                console.error(
-                  "Groq rate limit in response generation:",
-                  message,
-                );
-                return message;
-              }
               console.error("Response generation error:", error);
               return "Successfully generated your code.";
             }
           });
 
       const result = await step.run("save-result", async () => {
+        const projectState = await prisma.project.findUnique({
+          where: { id: projectId },
+          select: { cancelled: true },
+        });
+        if (projectState?.cancelled) return null;
+
         try {
           return await prisma.message.create({
             data: {
