@@ -24,8 +24,26 @@ export default async function Page({
 
   return (
     <HydrationBoundary state={dehydrate(queryClient)}>
-      <ErrorBoundary fallback={<p>Something went wrong.</p>}>
-        <Suspense fallback={<p>Loading...</p>}>
+      <ErrorBoundary
+        fallback={
+          <div className="flex h-screen items-center justify-center p-6 text-center">
+            <div className="max-w-md space-y-3">
+              <p className="text-lg font-medium text-destructive">Failed to load project</p>
+              <p className="text-sm text-muted-foreground">The project may not exist or you might not have access to it.</p>
+            </div>
+          </div>
+        }
+      >
+        <Suspense
+          fallback={
+            <div className="flex h-screen items-center justify-center">
+              <div className="flex flex-col items-center gap-3">
+                <div className="size-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+                <p className="text-sm text-muted-foreground">Loading project...</p>
+              </div>
+            </div>
+          }
+        >
           <ProjectView projectId={projectId} />
         </Suspense>
       </ErrorBoundary>

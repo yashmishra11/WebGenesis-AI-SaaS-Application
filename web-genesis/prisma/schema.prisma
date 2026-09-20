@@ -17,6 +17,8 @@ model Message {
   projectId String
   fragment  Fragment?
   project   Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
 }
 
 model Fragment {
@@ -38,6 +40,8 @@ model Project {
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   messages  Message[]
+
+  @@index([userId])
 }
 
 model Usage {

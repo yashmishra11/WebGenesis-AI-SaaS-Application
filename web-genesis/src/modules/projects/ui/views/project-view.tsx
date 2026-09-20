@@ -44,13 +44,41 @@ export const ProjectView = ({ projectId }: Props) => {
           minSize={20}
           className="flex flex-col min-h-0"
         >
-          <ErrorBoundary fallback={<p>project header error...</p>}>
-            <Suspense fallback={<p>Loading Project...</p>}>
+          <ErrorBoundary
+            fallback={
+              <div className="p-3 border-b text-xs text-muted-foreground flex items-center gap-2">
+                <span className="text-destructive">Failed to load project header</span>
+              </div>
+            }
+          >
+            <Suspense
+              fallback={
+                <div className="p-3 border-b flex items-center gap-2 animate-pulse">
+                  <div className="size-5 rounded bg-muted" />
+                  <div className="h-4 w-28 rounded bg-muted" />
+                </div>
+              }
+            >
               <ProjectHeader projectId={projectId} />
             </Suspense>
           </ErrorBoundary>
-          <ErrorBoundary fallback={<p>Messages error...</p>}>
-            <Suspense fallback={<p>Loading Messages...</p>}>
+          <ErrorBoundary
+            fallback={
+              <div className="flex-1 flex flex-col items-center justify-center p-6 text-center text-sm text-muted-foreground gap-2">
+                <p className="text-destructive font-medium">Failed to load messages</p>
+                <p className="text-xs">Please refresh the page to try again.</p>
+              </div>
+            }
+          >
+            <Suspense
+              fallback={
+                <div className="flex-1 p-4 space-y-4 animate-pulse">
+                  <div className="h-12 w-3/4 rounded-lg bg-muted" />
+                  <div className="h-16 w-1/2 rounded-lg bg-muted ml-auto" />
+                  <div className="h-12 w-2/3 rounded-lg bg-muted" />
+                </div>
+              }
+            >
               <MessagesContainer
                 projectId={projectId}
                 activeFragment={activeFragment}

@@ -6,7 +6,7 @@ interface Props {
 const layout = ({ children }: Props) => {
   return (
     <div>
-      <main className="flex flex-col min-h-screen max-h-screen">
+      <main className="flex flex-col min-h-screen">
         <Navbar />
         <div
           className="absolute inset-0 -z-10 h-full w-full bg-background dark:bg-[radial-gradient(#393e4a_1px, transparent_1px)]

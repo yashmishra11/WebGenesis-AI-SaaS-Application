@@ -45,7 +45,7 @@ export const MessageLoading = ({
       <div className="flex items-center gap-2 pl-2 mb-2">
         <Image
           src="/logo.svg"
-          alt="vibe"
+          alt="WebGenesis"
           width={18}
           height={18}
           className="shrink-0"

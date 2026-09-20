@@ -4,6 +4,7 @@ import { z } from "zod";
 
 const serverEnvSchema = z.object({
   DATABASE_URL: z.url(),
+  NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: z.string().min(1).optional(),
   CLERK_SECRET_KEY: z.string().min(1),
   INNGEST_EVENT_KEY: z.string().min(1).optional(),
   INNGEST_SIGNING_KEY: z.string().min(1).optional(),
@@ -16,6 +17,7 @@ const serverEnvSchema = z.object({
   OPENAI_API_KEY: z.string().min(1).optional(),
   OPENAI_MODEL: z.string().min(1).optional(),
   E2B_API_KEY: z.string().min(1),
+  E2B_TEMPLATE: z.string().min(1).optional(),
   NEXT_PUBLIC_APP_URL: z.url(),
   NODE_ENV: z
     .enum(["development", "production", "test"])
@@ -24,4 +26,16 @@ const serverEnvSchema = z.object({
   INNGEST_DEV: z.string().optional(),
 });
 
-export const env = serverEnvSchema.parse(process.env);
+const parsed = serverEnvSchema.safeParse(process.env);
+
+if (!parsed.success) {
+  const issues = parsed.error.issues
+    .map((issue) => `  - ${issue.path.join(".")}: ${issue.message}`)
+    .join("\n");
+  console.error(
+    `❌ Invalid environment configuration:\n${issues}\n\nPlease check your .env file or deployment environment variables.\n`,
+  );
+  throw new Error(`Invalid environment configuration:\n${issues}`);
+}
+
+export const env = parsed.data;
