@@ -22,8 +22,21 @@ export const projectsRouter = createTRPCRouter({
         throw new TRPCError({ code: "UNAUTHORIZED", message: "Not authenticated" });
       }
 
+      // If user is authenticated and has a guest cookie, claim matching guest project
+      if (userId && guestId) {
+        const guestProject = await prisma.project.findFirst({
+          where: { id: input.id, userId: `guest_${guestId}` },
+        });
+        if (guestProject) {
+          await prisma.project.update({
+            where: { id: input.id },
+            data: { userId },
+          });
+        }
+      }
+
       const userIdFilter = userId ?? `guest_${guestId}`;
-      const existingProject = await prisma.project.findUnique({
+      const existingProject = await prisma.project.findFirst({
         where: { id: input.id, userId: userIdFilter },
       });
 
@@ -35,6 +48,14 @@ export const projectsRouter = createTRPCRouter({
     }),
 
   getMany: protectedProcedure.query(async ({ ctx }) => {
+    // If user has a guest cookie, claim any guest projects so they appear in their dashboard
+    if (ctx.guestId) {
+      await prisma.project.updateMany({
+        where: { userId: `guest_${ctx.guestId}` },
+        data: { userId: ctx.auth.userId },
+      });
+    }
+
     const projects = await prisma.project.findMany({
       where: { userId: ctx.auth.userId },
       orderBy: { createdAt: "desc" },
@@ -100,8 +121,21 @@ export const projectsRouter = createTRPCRouter({
         throw new TRPCError({ code: "UNAUTHORIZED", message: "Not authenticated" });
       }
 
+      // If user is authenticated and has a guest cookie, claim matching guest project
+      if (userId && guestId) {
+        const guestProject = await prisma.project.findFirst({
+          where: { id: input.projectId, userId: `guest_${guestId}` },
+        });
+        if (guestProject) {
+          await prisma.project.update({
+            where: { id: input.projectId },
+            data: { userId },
+          });
+        }
+      }
+
       const userIdFilter = userId ?? `guest_${guestId}`;
-      const project = await prisma.project.findUnique({
+      const project = await prisma.project.findFirst({
         where: { id: input.projectId, userId: userIdFilter },
       });
 

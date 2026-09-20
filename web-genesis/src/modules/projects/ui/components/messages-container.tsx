@@ -1,7 +1,7 @@
 import { useSuspenseQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Messagecard } from "./message-card";
 import { Messageform } from "./message.form";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTRPC } from "@/trpc/client";
 import { MessageLoading } from "./message-loading";
 import { Fragment } from "@prisma/client";
@@ -81,15 +81,6 @@ export const MessagesContainer = ({
     isLastMessageFromUser && pendingDuration > SLOW_GENERATION_MS;
   const isTimedOut =
     isLastMessageFromUser && pendingDuration > PENDING_TIMEOUT_MS;
-  const latestAssistantError = useMemo(
-    () =>
-      [...messages]
-        .reverse()
-        .find(
-          (message) => message.role === "ASSISTANT" && message.type === "ERROR",
-        ),
-    [messages],
-  );
 
   useEffect(() => {
     if (!isLastMessageFromUser) return;
@@ -154,6 +145,11 @@ export const MessagesContainer = ({
       {/* Message Form */}
       <div className="relative p-3 pt-1 ">
         <div className="absolute -top-6 left-0 right-0 h-6 bg-gradient-to-b from-transparent to-background/70 pointer-events-none" />
+        {statusMessage && (
+          <div className="mb-2 px-3 py-1.5 rounded-md text-xs bg-muted/80 text-muted-foreground text-center">
+            {statusMessage}
+          </div>
+        )}
         {isLastMessageFromUser && (
           <div className="flex justify-center mb-2">
             <Button

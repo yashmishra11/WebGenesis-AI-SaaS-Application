@@ -7,7 +7,6 @@ import {
   SignedIn,
   SignedOut,
   SignInButton,
-  SignUp,
   SignUpButton,
 } from "@clerk/nextjs";
 import Image from "next/image";

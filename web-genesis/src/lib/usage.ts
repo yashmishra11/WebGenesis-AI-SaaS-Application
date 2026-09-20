@@ -50,6 +50,16 @@ export async function consumeGuestCredits(guestId: string) {
   return usageTracker.consume(`guest_${guestId}`, GENERATION_COST);
 }
 
+export async function getGuestUsageStatus(guestId: string) {
+  const usageTracker = new RateLimiterPrisma({
+    storeClient: prisma,
+    tableName: "Usage",
+    points: GUEST_POINTS,
+    duration: DURATION,
+  });
+  return usageTracker.get(`guest_${guestId}`);
+}
+
 // userId can be a real Clerk userId or "guest_<guestId>"
 export async function refundCredit(userId: string) {
   const isGuest = userId.startsWith("guest_");

@@ -19,7 +19,6 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Charis_SIL } from "next/font/google";
 
 interface Props {
   projectId: string;
@@ -49,10 +48,9 @@ export const ProjectHeader = ({ projectId }: Props) => {
         </DropdownMenuTrigger>
         <DropdownMenuContent side="bottom" align="start">
           <DropdownMenuItem asChild>
-            <Link href="/">
-              <ChevronLeftIcon>
-                <span>Go to Dashboard</span>
-              </ChevronLeftIcon>
+            <Link href="/" className="flex items-center gap-2">
+              <ChevronLeftIcon className="size-4" />
+              <span>Go to Dashboard</span>
             </Link>
           </DropdownMenuItem>
           <DropdownMenuSeparator />

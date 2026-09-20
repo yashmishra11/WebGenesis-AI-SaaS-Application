@@ -10,6 +10,7 @@ import {
   ResizablePanelGroup,
 } from "@/components/ui/resizable";
 import { TreeView } from "./tree-view";
+import { TreeItem } from "@/types";
 import {
   Breadcrumb,
   BreadcrumbEllipsis,
@@ -85,9 +86,11 @@ const FileBreadcrumb = ({ filePath }: FileBreadcrumbProps) => {
   );
 };
 
+type FileTreeNode = { [key: string]: string | FileTreeNode };
+
 // Convert files object to array-based tree structure
-function convertFilesToTreeItems(files: FileCollection): any {
-  const tree: { [key: string]: any } = {};
+function convertFilesToTreeItems(files: FileCollection): TreeItem[] {
+  const tree: FileTreeNode = {};
 
   // Build the tree structure
   Object.keys(files)
@@ -107,27 +110,28 @@ function convertFilesToTreeItems(files: FileCollection): any {
           if (!current[part] || typeof current[part] === "string") {
             current[part] = {};
           }
-          current = current[part];
+          current = current[part] as FileTreeNode;
         }
       });
     });
 
   // Convert object tree to array format [name, children...]
-  function objectToArray(obj: any, name?: string): any {
+  function objectToArray(obj: FileTreeNode | string, name?: string): TreeItem | TreeItem[] {
     if (typeof obj === "string") {
       // It's a file - return just the filename (the full path is stored in the tree)
-      return name;
+      return name ?? obj;
     }
 
     // It's a folder - return [name, ...children]
     const children = Object.keys(obj)
       .sort()
-      .map((key) => objectToArray(obj[key], key));
+      .map((key) => objectToArray(obj[key], key) as TreeItem);
 
     return name ? [name, ...children] : children;
   }
 
-  return objectToArray(tree);
+  const result = objectToArray(tree);
+  return Array.isArray(result) ? (result as TreeItem[]) : [result];
 }
 
 interface FileExplorerProps {

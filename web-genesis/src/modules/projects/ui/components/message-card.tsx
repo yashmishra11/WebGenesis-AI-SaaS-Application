@@ -17,7 +17,7 @@ interface Messagecardprops {
 }
 
 interface Usermessage {
-  content: String;
+  content: string;
 }
 
 interface AssistantMessage {

@@ -117,18 +117,34 @@ const openai = env.OPENAI_API_KEY
     })
   : null;
 
-function isRateLimitError(error: any) {
+interface PotentialApiError {
+  status?: number;
+  code?: string;
+  message?: string;
+  error?: {
+    code?: string;
+    message?: string;
+  };
+}
+
+function isRateLimitError(error: unknown): boolean {
+  if (typeof error !== "object" || error === null) return false;
+  const err = error as PotentialApiError;
   return (
-    error?.status === 429 ||
-    error?.code === "rate_limit_exceeded" ||
-    error?.error?.code === "rate_limit_exceeded"
+    err.status === 429 ||
+    err.code === "rate_limit_exceeded" ||
+    err.error?.code === "rate_limit_exceeded"
   );
 }
 
-function getRateLimitMessage(error: any) {
+function getRateLimitMessage(error: unknown): string {
+  if (typeof error !== "object" || error === null) {
+    return "Rate limit reached. Please retry later.";
+  }
+  const err = error as PotentialApiError;
   return (
-    error?.error?.message ||
-    error?.message ||
+    err.error?.message ||
+    err.message ||
     "Rate limit reached. Please retry later."
   );
 }
@@ -452,10 +468,16 @@ async function runTerminal(command: string, sandbox: Sandbox) {
     },
   });
 
+  const executionResult = res as {
+    stdout?: string;
+    stderr?: string;
+    exitCode?: number | null;
+  };
+
   return {
-    stdout: buffers.stdout || (res as any).stdout || "",
-    stderr: buffers.stderr || (res as any).stderr || "",
-    exitCode: (res as any).exitCode ?? null,
+    stdout: buffers.stdout || executionResult.stdout || "",
+    stderr: buffers.stderr || executionResult.stderr || "",
+    exitCode: executionResult.exitCode ?? null,
   };
 }
 
@@ -634,7 +656,7 @@ export const codeAgentFunction = inngest.createFunction(
             temperature: 0.4,
             max_tokens: 2500,
           });
-        } catch (error: any) {
+        } catch (error: unknown) {
           if (isRateLimitError(error)) {
             const rateLimitMessage = getRateLimitMessage(error);
             console.error("Rate limit on all providers:", rateLimitMessage);
@@ -659,7 +681,7 @@ export const codeAgentFunction = inngest.createFunction(
         let execution;
         try {
           execution = await executeToolCall(parsed, sandboxInstance);
-        } catch (error: any) {
+        } catch (error: unknown) {
           console.error("Tool execution error:", error);
           const fallback = createFallbackPage();
           execution = {
@@ -731,7 +753,7 @@ export const codeAgentFunction = inngest.createFunction(
                 FRAGMENT_TITLE_PROMPT,
                 agentState.summary,
               );
-            } catch (error: any) {
+            } catch (error: unknown) {
               console.error("Fragment title generation error:", error);
               return "Generated Page";
             }
@@ -742,7 +764,7 @@ export const codeAgentFunction = inngest.createFunction(
         : await step.run("generate-response", async () => {
             try {
               return await callLLMSimple(RESPONSE_PROMPT, agentState.summary);
-            } catch (error: any) {
+            } catch (error: unknown) {
               console.error("Response generation error:", error);
               return "Successfully generated your code.";
             }

@@ -1,10 +1,16 @@
-import { getUsageStatus } from "@/lib/usage";
-import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
+import { getUsageStatus, getGuestUsageStatus } from "@/lib/usage";
+import { createTRPCRouter, baseProcedure } from "@/trpc/init";
+
 export const usageRouter = createTRPCRouter({
-  status: protectedProcedure.query(async () => {
+  status: baseProcedure.query(async ({ ctx }) => {
     try {
-      const result = await getUsageStatus();
-      return result;
+      if (ctx.auth.userId) {
+        return await getUsageStatus();
+      }
+      if (ctx.guestId) {
+        return await getGuestUsageStatus(ctx.guestId);
+      }
+      return null;
     } catch {
       return null;
     }

@@ -1,8 +1,8 @@
 import { z } from "zod";
 import { assertInngestCanSendEvents, inngest } from "@/inngest/client";
-import { baseProcedure, protectedProcedure, createTRPCRouter } from "@/trpc/init";
+import { baseProcedure, createTRPCRouter } from "@/trpc/init";
 import { TRPCError } from "@trpc/server";
-import { consumeCredits } from "@/lib/usage";
+import { consumeCredits, consumeGuestCredits } from "@/lib/usage";
 import { prisma } from "@/lib/db";
 
 export const messagesRouter = createTRPCRouter({
@@ -20,6 +20,19 @@ export const messagesRouter = createTRPCRouter({
         throw new TRPCError({ code: "UNAUTHORIZED", message: "Not authenticated" });
       }
 
+      // If user is authenticated and has a guest cookie, claim matching guest project
+      if (userId && guestId) {
+        const guestProject = await prisma.project.findFirst({
+          where: { id: input.projectId, userId: `guest_${guestId}` },
+        });
+        if (guestProject) {
+          await prisma.project.update({
+            where: { id: input.projectId },
+            data: { userId },
+          });
+        }
+      }
+
       const userIdFilter = userId ?? `guest_${guestId}`;
 
       const messages = await prisma.message.findMany({
@@ -32,7 +45,7 @@ export const messagesRouter = createTRPCRouter({
       });
       return messages;
     }),
-  create: protectedProcedure
+  create: baseProcedure
     .input(
       z.object({
         value: z
@@ -43,10 +56,34 @@ export const messagesRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ input, ctx }) => {
-      const existingProject = await prisma.project.findUnique({
+      const userId = ctx.auth.userId;
+      const guestId = ctx.guestId;
+
+      if (!userId && !guestId) {
+        throw new TRPCError({
+          code: "UNAUTHORIZED",
+          message: "Not authenticated",
+        });
+      }
+
+      // If user is authenticated and has a guest cookie, claim matching guest project
+      if (userId && guestId) {
+        const guestProject = await prisma.project.findFirst({
+          where: { id: input.projectId, userId: `guest_${guestId}` },
+        });
+        if (guestProject) {
+          await prisma.project.update({
+            where: { id: input.projectId },
+            data: { userId },
+          });
+        }
+      }
+
+      const userIdFilter = userId ?? `guest_${guestId}`;
+      const existingProject = await prisma.project.findFirst({
         where: {
           id: input.projectId,
-          userId: ctx.auth.userId,
+          userId: userIdFilter,
         },
       });
 
@@ -58,22 +95,33 @@ export const messagesRouter = createTRPCRouter({
       }
 
       try {
-        await consumeCredits();
-      } catch (error: any) {
+        if (userId) {
+          await consumeCredits();
+        } else if (guestId) {
+          await consumeGuestCredits(guestId);
+        }
+      } catch (error: unknown) {
         console.error("❌ Error consuming credits:", error);
 
-        if (error.msBeforeNext !== undefined) {
+        const rateLimitErr =
+          typeof error === "object" && error !== null
+            ? (error as { msBeforeNext?: number; message?: string })
+            : null;
+
+        if (rateLimitErr?.msBeforeNext !== undefined) {
           throw new TRPCError({
             code: "TOO_MANY_REQUESTS",
-            message: `You have run out of credits. Try again in ${Math.ceil(
-              error.msBeforeNext / 1000 / 60 / 60 / 24,
-            )} days.`,
+            message: userId
+              ? `You have run out of credits. Try again in ${Math.ceil(
+                  rateLimitErr.msBeforeNext / 1000 / 60 / 60 / 24,
+                )} days.`
+              : "You've used all your free generations. Sign in to continue.",
           });
         }
 
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
-          message: error.message || "Failed to consume credits",
+          message: rateLimitErr?.message || "Failed to consume credits",
         });
       }
 
