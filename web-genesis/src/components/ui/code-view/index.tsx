@@ -9,7 +9,7 @@ import "prismjs/components/prism-jsx";
 
 import "prismjs/components/prism-tsx";
 
-import "./code-theme.css";
+import "./code-view.css";
 
 interface Props {
   code: string;
