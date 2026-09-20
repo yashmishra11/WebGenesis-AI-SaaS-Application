@@ -526,6 +526,11 @@ async function runTerminal(command: string, sandbox: Sandbox) {
   };
 }
 
+function autoFixJsxCode(content: string): string {
+  // Fix unclosed JSX comments like {/* comment */ without closing }
+  return content.replace(/(\{\/\*[\s\S]*?\*\/)(?!\})/g, "$1}");
+}
+
 async function createOrUpdateFiles(
   files: { path: string; content: string }[],
   sandbox: Sandbox,
@@ -534,7 +539,12 @@ async function createOrUpdateFiles(
     if (!isSafeRelativePath(file.path)) {
       throw new Error(`Unsafe file path blocked: ${file.path}`);
     }
-    await sandbox.files.write(file.path, file.content);
+    const sanitized =
+      file.path.endsWith(".tsx") || file.path.endsWith(".jsx")
+        ? autoFixJsxCode(file.content)
+        : file.content;
+    file.content = sanitized;
+    await sandbox.files.write(file.path, sanitized);
   }
   return { updated: files.map((f) => f.path) };
 }
