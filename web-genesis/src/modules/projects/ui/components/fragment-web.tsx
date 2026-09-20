@@ -5,12 +5,15 @@ import {
   ChevronDownIcon,
   ExternalLinkIcon,
   Loader2Icon,
+  MonitorIcon,
   MoonIcon,
   PaletteIcon,
   RefreshCcwIcon,
   ShuffleIcon,
+  SmartphoneIcon,
   SparklesIcon,
   SlidersHorizontalIcon,
+  TabletIcon,
 } from "lucide-react";
 import { Fragment } from "@prisma/client";
 import { Hint } from "@/components/ui/hint";
@@ -81,6 +84,8 @@ const VARIATION_PRESETS = [
 export function FragmentWeb({ data, projectId, isGenerating }: Props) {
   const [fragmentKey, setFragmentKey] = useState(0);
   const [copied, setCopied] = useState(false);
+  const [deviceMode, setDeviceMode] = useState<"desktop" | "tablet" | "mobile">("desktop");
+  const [isLoading, setIsLoading] = useState(true);
 
   const trpc = useTRPC();
   const queryClient = useQueryClient();
@@ -114,6 +119,7 @@ export function FragmentWeb({ data, projectId, isGenerating }: Props) {
   const isPending = createMessage.isPending || !!isGenerating;
 
   const onRefresh = () => {
+    setIsLoading(true);
     setFragmentKey((prev) => prev + 1);
   };
 
@@ -152,6 +158,40 @@ export function FragmentWeb({ data, projectId, isGenerating }: Props) {
             <span className="truncate">{data.sandboxUrl}</span>
           </Button>
         </Hint>
+
+        {/* Device Switcher */}
+        <div className="inline-flex items-center rounded-lg border bg-muted/40 p-0.5">
+          <Hint text="Desktop View" side="bottom">
+            <Button
+              size="sm"
+              variant={deviceMode === "desktop" ? "secondary" : "ghost"}
+              onClick={() => setDeviceMode("desktop")}
+              className="h-7 w-7 p-0 rounded-md"
+            >
+              <MonitorIcon className="size-3.5" />
+            </Button>
+          </Hint>
+          <Hint text="Tablet View (768px)" side="bottom">
+            <Button
+              size="sm"
+              variant={deviceMode === "tablet" ? "secondary" : "ghost"}
+              onClick={() => setDeviceMode("tablet")}
+              className="h-7 w-7 p-0 rounded-md"
+            >
+              <TabletIcon className="size-3.5" />
+            </Button>
+          </Hint>
+          <Hint text="Mobile View (390px)" side="bottom">
+            <Button
+              size="sm"
+              variant={deviceMode === "mobile" ? "secondary" : "ghost"}
+              onClick={() => setDeviceMode("mobile")}
+              className="h-7 w-7 p-0 rounded-md"
+            >
+              <SmartphoneIcon className="size-3.5" />
+            </Button>
+          </Hint>
+        </div>
 
         {/* Regenerate Variation Action */}
         {!!projectId && (
@@ -230,13 +270,49 @@ export function FragmentWeb({ data, projectId, isGenerating }: Props) {
         </Hint>
       </div>
 
-      <iframe
-        key={fragmentKey}
-        sandbox="allow-forms allow-scripts allow-same-origin"
-        className="h-full w-full"
-        loading="lazy"
-        src={data.sandboxUrl}
-      />
+      {/* Frame Container */}
+      <div
+        className={
+          deviceMode === "desktop"
+            ? "relative flex-1 w-full h-full min-h-0 bg-background"
+            : "relative flex-1 w-full h-full min-h-0 bg-muted/20 flex items-center justify-center p-4 overflow-auto"
+        }
+      >
+        {/* Loading Spinner Overlay */}
+        {isLoading && (
+          <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 bg-background/80 backdrop-blur-xs transition-opacity">
+            <Loader2Icon className="size-6 animate-spin text-primary" />
+            <span className="text-xs font-medium text-muted-foreground">
+              Loading live preview...
+            </span>
+          </div>
+        )}
+
+        <div
+          className={
+            deviceMode === "desktop"
+              ? "w-full h-full"
+              : deviceMode === "tablet"
+                ? "w-[768px] max-w-full h-[95%] rounded-xl border border-border/80 shadow-2xl overflow-hidden bg-background relative flex flex-col"
+                : "w-[390px] max-w-full h-[95%] rounded-[2.5rem] border-8 border-border/90 shadow-2xl overflow-hidden bg-background relative flex flex-col"
+          }
+        >
+          {deviceMode === "mobile" && (
+            <div className="h-5 w-full bg-border/40 flex items-center justify-center shrink-0">
+              <div className="h-2.5 w-20 rounded-full bg-foreground/20" />
+            </div>
+          )}
+
+          <iframe
+            key={fragmentKey}
+            sandbox="allow-forms allow-scripts allow-same-origin"
+            className="h-full w-full border-none"
+            loading="eager"
+            src={data.sandboxUrl}
+            onLoad={() => setIsLoading(false)}
+          />
+        </div>
+      </div>
     </div>
   );
 }

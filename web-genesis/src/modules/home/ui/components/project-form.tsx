@@ -94,8 +94,8 @@ export const ProjectForm = () => {
         <section className="space-y-6">
           <form
             className={cn(
-              "relative border p-4 pt-1 rounded-xl bg-sidebar dark:bg-sidebar transition-all ",
-              isFocused && "shadow-xs "
+              "relative border p-4 pt-2 rounded-2xl bg-card/80 backdrop-blur-md transition-all duration-200 shadow-sm hover:border-primary/40",
+              isFocused && "ring-2 ring-primary/20 border-primary shadow-lg shadow-primary/5"
             )}
             onSubmit={form.handleSubmit(onSubmit)}
             action=""
@@ -109,14 +109,14 @@ export const ProjectForm = () => {
                   {...field}
                   onFocus={() => setFocused(true)}
                   onBlur={() => setFocused(false)}
-                  minRows={2}
+                  minRows={3}
                   maxRows={8}
-                  className="pt-4 resize-none border-none w-full outline-none bg-transparent "
-                  placeholder="What would you like to build"
+                  className="pt-2 resize-none border-none w-full outline-none bg-transparent text-sm md:text-base leading-relaxed placeholder:text-muted-foreground/60"
+                  placeholder="What would you like to build? (e.g. A modern SaaS dashboard with analytics charts and dark mode)"
                   onKeyDown={(e) => {
-                    if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+                    if (e.key === "Enter" && !e.shiftKey) {
                       e.preventDefault();
-                      form.handleSubmit(onSubmit)(e);
+                      form.handleSubmit(onSubmit)();
                     }
                   }}
                 />
@@ -124,23 +124,28 @@ export const ProjectForm = () => {
             />
 
             <div className="flex gap-x-2 items-end justify-between pt-2">
-              <div className="text-[10px] text-muted-foreground font-mono">
-                <kbd className="ml-auto pointer-events-auto inline-flex h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground">
-                  <span>&#8984;</span>Enter
+              <div className="text-[11px] text-muted-foreground font-mono flex items-center gap-1.5 flex-wrap">
+                <kbd className="inline-flex h-5 select-none items-center gap-1 rounded border bg-muted/60 px-1.5 font-mono text-[10px] font-medium text-muted-foreground">
+                  Enter
                 </kbd>
-                &nbsp; to submit
+                <span>to submit</span>
+                <span className="text-muted-foreground/40">·</span>
+                <kbd className="inline-flex h-5 select-none items-center gap-1 rounded border bg-muted/60 px-1.5 font-mono text-[10px] font-medium text-muted-foreground">
+                  Shift + Enter
+                </kbd>
+                <span>for new line</span>
               </div>
               <Button
                 disabled={isButtonDisabled}
                 className={cn(
-                  "size-8 rounded-full",
-                  isButtonDisabled && "bg-muted-foreground border "
+                  "size-8 rounded-full transition-transform active:scale-95",
+                  isButtonDisabled && "bg-muted-foreground border opacity-50"
                 )}
               >
                 {isPending ? (
                   <Loader2Icon className="size-4 animate-spin" />
                 ) : (
-                  <ArrowUpIcon />
+                  <ArrowUpIcon className="size-4" />
                 )}
               </Button>
             </div>
@@ -149,13 +154,14 @@ export const ProjectForm = () => {
           <div className="flex-wrap justify-center gap-2 hidden md:flex max-w-3xl">
             {PROJECT_TEMPLATES.map((template) => (
               <Button
-                variant={"outline"}
+                variant="outline"
                 size="sm"
-                className="bg-white dark:bg-sidebar"
+                className="bg-card/70 backdrop-blur-xs hover:border-primary/50 hover:bg-muted/80 transition-all duration-200 text-xs font-medium rounded-full px-3.5 shadow-xs"
                 key={template.title}
                 onClick={() => onSelect(template.prompt)}
               >
-                {template.emoji} {template.title}
+                <span className="mr-1.5">{template.emoji}</span>
+                {template.title}
               </Button>
             ))}
           </div>

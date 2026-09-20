@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { EyeIcon, CodeIcon, CrownIcon } from "lucide-react";
+import { EyeIcon, CodeIcon, CrownIcon, SparklesIcon } from "lucide-react";
 // import { useSuspenseQuery } from "@tanstack/react-query";
 import type { Fragment } from "@prisma/client";
 import { useAuth } from "@clerk/nextjs";
@@ -116,16 +116,43 @@ export const ProjectView = ({ projectId }: Props) => {
                 <Profile />
               </div>
             </div>
-            <TabsContent value="preview">
-              {!!activeFragment && (
+            <TabsContent value="preview" className="h-full">
+              {!!activeFragment ? (
                 <FragmentWeb data={activeFragment} projectId={projectId} />
+              ) : (
+                <div className="h-full w-full flex flex-col items-center justify-center p-8 bg-muted/10 text-center select-none">
+                  <div className="relative mb-6">
+                    <div className="absolute -inset-4 rounded-full bg-primary/10 blur-xl animate-pulse" />
+                    <div className="relative size-16 rounded-2xl border border-border/80 bg-background shadow-lg flex items-center justify-center">
+                      <SparklesIcon className="size-8 text-primary" />
+                    </div>
+                  </div>
+                  <h3 className="text-base font-semibold text-foreground mb-1">
+                    Ready to Build
+                  </h3>
+                  <p className="text-xs text-muted-foreground max-w-sm mb-6 leading-relaxed">
+                    Type a prompt or select a template on the left. Your interactive web application will compile and render live here.
+                  </p>
+                  <div className="flex items-center gap-2.5 text-[11px] text-muted-foreground bg-background border px-3.5 py-1.5 rounded-full shadow-xs">
+                    <span className="size-2 rounded-full bg-emerald-500 animate-pulse" />
+                    <span>Live Next.js Sandbox & Turbopack Ready</span>
+                  </div>
+                </div>
               )}
             </TabsContent>
-            <TabsContent value="code" className="min-h-0">
-              {!!activeFragment?.files && (
+            <TabsContent value="code" className="min-h-0 h-full">
+              {!!activeFragment?.files ? (
                 <FileExplorer
                   files={activeFragment.files as { [path: string]: string }}
                 />
+              ) : (
+                <div className="h-full w-full flex flex-col items-center justify-center p-8 text-center text-muted-foreground bg-muted/10">
+                  <CodeIcon className="size-10 mb-3 opacity-30" />
+                  <p className="text-sm font-medium">No code generated yet</p>
+                  <p className="text-xs text-muted-foreground/70 mt-1">
+                    Generated React components and stylesheets will be browsable here.
+                  </p>
+                </div>
               )}
             </TabsContent>
           </Tabs>

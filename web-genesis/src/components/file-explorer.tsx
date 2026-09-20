@@ -1,5 +1,7 @@
-import { CopyCheckIcon, CopyIcon } from "lucide-react";
+import { CopyCheckIcon, CopyIcon, DownloadIcon, Loader2Icon } from "lucide-react";
 import { useState, useMemo, useCallback, Fragment } from "react";
+import JSZip from "jszip";
+import { toast } from "sonner";
 
 import { Hint } from "@/components/ui/hint";
 import { Button } from "@/components/ui/button";
@@ -140,6 +142,7 @@ interface FileExplorerProps {
 
 export const FileExplorer = ({ files }: FileExplorerProps) => {
   const [copied, setCopied] = useState(false);
+  const [isZipping, setIsZipping] = useState(false);
   const [selectedFile, setSelectedFile] = useState<string | null>(() => {
     const fileKeys = Object.keys(files);
     return fileKeys.length > 0 ? fileKeys[0] : null;
@@ -155,32 +158,44 @@ export const FileExplorer = ({ files }: FileExplorerProps) => {
     }
   }, [selectedFile, files]);
 
+  const handleDownloadZip = async () => {
+    try {
+      setIsZipping(true);
+      const zip = new JSZip();
+      for (const [filePath, content] of Object.entries(files)) {
+        const cleanPath = filePath.replace(/^\/+/, "");
+        zip.file(cleanPath, content);
+      }
+      const blob = await zip.generateAsync({ type: "blob" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "webgenesis-project.zip";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      toast.success("Project ZIP downloaded!");
+    } catch (err) {
+      console.error("ZIP download failed:", err);
+      toast.error("Failed to generate ZIP archive");
+    } finally {
+      setIsZipping(false);
+    }
+  };
+
   const treeData = useMemo(() => {
-    console.log("Files object:", files);
-    const data = convertFilesToTreeItems(files);
-    console.log("Converted tree data:", data);
-    return data;
+    return convertFilesToTreeItems(files);
   }, [files]);
 
   const handleFileSelect = useCallback(
     (filePath: string) => {
-      console.log("=== FILE SELECT DEBUG ===");
-      console.log("Selected path:", filePath);
-      console.log("File exists in files object:", !!files[filePath]);
-      console.log("All available file keys:", Object.keys(files));
-      console.log("File content:", files[filePath] ? "EXISTS" : "MISSING");
-
       if (files[filePath]) {
         setSelectedFile(filePath);
-      } else {
-        console.error("❌ File not found:", filePath);
       }
     },
     [files]
   );
-
-  console.log("Current selected file:", selectedFile);
-  console.log("Selected file exists:", !!files[selectedFile || ""]);
 
   return (
     <ResizablePanelGroup direction="horizontal">
@@ -197,17 +212,36 @@ export const FileExplorer = ({ files }: FileExplorerProps) => {
           <div className="h-full w-full flex flex-col">
             <div className="border-b bg-sidebar px-4 py-2 flex justify-between items-center gap-x-2">
               <FileBreadcrumb filePath={selectedFile} />
-              <Hint text="Copy to clipboard" side="bottom">
-                <Button
-                  variant="outline"
-                  size="icon"
-                  className="ml-auto"
-                  onClick={handleCopy}
-                  disabled={copied}
-                >
-                  {copied ? <CopyCheckIcon /> : <CopyIcon />}
-                </Button>
-              </Hint>
+              <div className="ml-auto flex items-center gap-1.5">
+                <Hint text="Download full project as ZIP" side="bottom">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-8 gap-1.5 text-xs text-muted-foreground hover:text-foreground"
+                    onClick={handleDownloadZip}
+                    disabled={isZipping || Object.keys(files).length === 0}
+                  >
+                    {isZipping ? (
+                      <Loader2Icon className="size-3.5 animate-spin" />
+                    ) : (
+                      <DownloadIcon className="size-3.5" />
+                    )}
+                    <span>{isZipping ? "Zipping..." : "Download ZIP"}</span>
+                  </Button>
+                </Hint>
+
+                <Hint text="Copy file content" side="bottom">
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="h-8 w-8"
+                    onClick={handleCopy}
+                    disabled={copied}
+                  >
+                    {copied ? <CopyCheckIcon className="size-3.5 text-emerald-500" /> : <CopyIcon className="size-3.5" />}
+                  </Button>
+                </Hint>
+              </div>
             </div>
             <div className="flex-1 overflow-auto">
               <CodeView

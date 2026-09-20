@@ -22,6 +22,7 @@ type ModelMessage = {
 
 const DEFAULT_GROQ_MODELS = [
   "groq/compound",
+  "groq/compound-mini",
   "openai/gpt-oss-120b",
   "openai/gpt-oss-20b",
   "qwen/qwen3.8-27b",
@@ -298,16 +299,6 @@ function parseGroqWaitMs(detail: string): number | null {
   throw error;
 }
 
-async function callLLMSimple(
-  systemPrompt: string,
-  userPrompt: string,
-): Promise<string> {
-  return callLLMWithFallbacks([
-    { role: "system", content: systemPrompt },
-    { role: "user", content: userPrompt },
-  ]);
-}
-
 function extractFirstJSONObject(text: string): string | null {
   let start = -1;
   let depth = 0;
@@ -531,6 +522,41 @@ function autoFixJsxCode(content: string): string {
   return content.replace(/(\{\/\*[\s\S]*?\*\/)(?!\})/g, "$1}");
 }
 
+function scoreCandidateCode(code: string): number {
+  if (!code || typeof code !== "string") return 0;
+  let score = 0;
+
+  // 1. Valid React & Next.js structure
+  if (code.includes('"use client"') || code.includes("'use client'")) score += 15;
+  if (code.includes("export default function") || code.includes("export default")) score += 15;
+
+  // 2. React Interactivity & State
+  if (code.includes("useState")) score += 15;
+  if (code.includes("onClick") || code.includes("onChange") || code.includes("onSubmit")) score += 10;
+  if (code.includes("useMemo") || code.includes("useEffect")) score += 5;
+
+  // 3. Mock Data Richness (detecting realistic arrays of objects)
+  const arrayMatches = code.match(/\[\s*\{[\s\S]*?\}\s*\]/g);
+  if (arrayMatches && arrayMatches.length > 0) {
+    score += 15;
+    if (code.includes("https://images.unsplash.com") || code.includes("avatar")) score += 5;
+  }
+
+  // 4. Responsive Layout & Tailwind structure
+  if (code.includes("md:") || code.includes("lg:")) score += 10;
+  if (code.includes("grid-cols-") || code.includes("flex-col")) score += 10;
+
+  // 5. Component & Icon Polish
+  if (code.includes("lucide-react")) score += 10;
+  if (code.includes("@/components/ui/")) score += 10;
+
+  // Penalties
+  if (code.includes("// TODO") || code.includes("/* TODO */")) score -= 30;
+  if (code.length < 500) score -= 25;
+
+  return Math.max(0, score);
+}
+
 async function createOrUpdateFiles(
   files: { path: string; content: string }[],
   sandbox: Sandbox,
@@ -610,17 +636,8 @@ export const codeAgentFunction = inngest.createFunction(
     }
 
     try {
-      const sandboxId = await step.run("create-sandbox", async () => {
-        const template = process.env.E2B_TEMPLATE || "web-test";
-        const s = await Sandbox.create(template);
-        await s.setTimeout(SANDBOX_TIMEOUT);
-        return s.sandboxId;
-      });
-
-      const sandboxInstance = await getSandBox(sandboxId);
-
-      const latestFragmentFiles = await step.run(
-        "get-latest-fragment-files",
+      const latestFragmentInfo = await step.run(
+        "get-latest-fragment-info",
         async () => {
           const latestFragment = await prisma.fragment.findFirst({
             where: {
@@ -633,15 +650,55 @@ export const codeAgentFunction = inngest.createFunction(
               createdAt: "desc",
             },
             select: {
+              sandboxUrl: true,
               files: true,
             },
           });
 
-          return normalizeFragmentFiles(latestFragment?.files);
+          return {
+            sandboxUrl: latestFragment?.sandboxUrl || null,
+            files: normalizeFragmentFiles(latestFragment?.files),
+          };
         },
       );
 
-      if (latestFragmentFiles.length) {
+      const { sandboxId, isReused } = await step.run(
+        "get-or-create-sandbox",
+        async () => {
+          const prevUrl = latestFragmentInfo?.sandboxUrl;
+          const prevSandboxId = prevUrl?.match(
+            /3000-([a-z0-9]+)\.e2b\.app/i,
+          )?.[1];
+          if (prevSandboxId) {
+            try {
+              console.log(
+                `[E2B] Attempting warm connection to sandbox: ${prevSandboxId}`,
+              );
+              const s = await Sandbox.connect(prevSandboxId);
+              await s.setTimeout(SANDBOX_TIMEOUT);
+              console.log(
+                `[E2B] Warm connection successful! Reused sandbox: ${prevSandboxId}`,
+              );
+              return { sandboxId: prevSandboxId, isReused: true };
+            } catch (connectError) {
+              console.warn(
+                `[E2B] Warm sandbox connection failed, creating fresh sandbox:`,
+                connectError,
+              );
+            }
+          }
+          const template = process.env.E2B_TEMPLATE || "web-test";
+          const s = await Sandbox.create(template);
+          await s.setTimeout(SANDBOX_TIMEOUT);
+          return { sandboxId: s.sandboxId, isReused: false };
+        },
+      );
+
+      const sandboxInstance = await getSandBox(sandboxId);
+
+      const latestFragmentFiles = latestFragmentInfo.files;
+
+      if (!isReused && latestFragmentFiles.length) {
         await createOrUpdateFiles(latestFragmentFiles, sandboxInstance);
       }
 
@@ -717,7 +774,7 @@ export const codeAgentFunction = inngest.createFunction(
         let raw: string;
         try {
           raw = await callLLMWithFallbacks(agentMessages, {
-            temperature: 0.4,
+            temperature: 0.35,
             max_tokens: 2048,
           });
         } catch (error: unknown) {
@@ -736,6 +793,58 @@ export const codeAgentFunction = inngest.createFunction(
         console.log("Raw LLM response (truncated):", truncateLog(raw));
 
         let parsed = parseToolCall(raw);
+        let cand1Score = 0;
+
+        if (parsed && parsed.tool === "createOrUpdateFiles") {
+          const mainFile = parsed.args.files.find((f) =>
+            f.path.includes("page.tsx"),
+          );
+          if (mainFile) {
+            cand1Score = scoreCandidateCode(mainFile.content);
+          }
+        }
+
+        console.log(
+          `[Quality Evaluation] Candidate 1 parsed: ${!!parsed}, quality score: ${cand1Score}/100`,
+        );
+
+        // If Candidate 1 failed to parse or scored low, perform an adaptive second try
+        if ((!parsed || cand1Score < 60) && i === 0) {
+          console.log(
+            `[Quality Evaluation] Candidate 1 scored below threshold (${cand1Score}/100). Generating Candidate 2...`,
+          );
+          try {
+            const raw2 = await callLLMWithFallbacks(agentMessages, {
+              temperature: 0.65,
+              max_tokens: 2048,
+            });
+            const parsed2 = parseToolCall(raw2);
+            if (parsed2 && parsed2.tool === "createOrUpdateFiles") {
+              const mainFile2 = parsed2.args.files.find((f) =>
+                f.path.includes("page.tsx"),
+              );
+              const cand2Score = mainFile2
+                ? scoreCandidateCode(mainFile2.content)
+                : 0;
+              console.log(
+                `[Quality Evaluation] Candidate 2 quality score: ${cand2Score}/100`,
+              );
+              if (cand2Score > cand1Score) {
+                console.log(
+                  `[Quality Evaluation] Candidate 2 won (${cand2Score} vs ${cand1Score}). Adopting Candidate 2.`,
+                );
+                raw = raw2;
+                parsed = parsed2;
+              }
+            }
+          } catch (cand2Err) {
+            console.warn(
+              `[Quality Evaluation] Candidate 2 generation skipped:`,
+              cand2Err,
+            );
+          }
+        }
+
         if (!parsed) {
           console.log("Parsing failed, using fallback page");
           parsed = createFallbackPage();
@@ -773,6 +882,17 @@ export const codeAgentFunction = inngest.createFunction(
         if (parsed.tool === "done") {
           finalSummary = parsed.args.summary;
           break;
+        }
+
+        // If app/page.tsx was written in step 0, generation is complete!
+        // Break early to eliminate redundant agent roundtrips.
+        if (parsed.tool === "createOrUpdateFiles") {
+          const filesCreated = parsed.args.files;
+          const hasPage = filesCreated.some((f) => f.path.includes("page.tsx"));
+          if (hasPage) {
+            finalSummary = "Your application was built and is ready to preview.";
+            break;
+          }
         }
 
         agentMessages.push({
@@ -822,29 +942,35 @@ export const codeAgentFunction = inngest.createFunction(
         };
       }
 
-      const fragmentTitleOutput = assistantErrorMessage
-        ? "Generation Error"
-        : await step.run("generate-fragment-title", async () => {
-            try {
-              return await callLLMSimple(
-                FRAGMENT_TITLE_PROMPT,
-                agentState.summary,
-              );
-            } catch (error: unknown) {
-              console.error("Fragment title generation error:", error);
-              return "Generated Page";
-            }
-          });
-
-      const responseOutput = assistantErrorMessage
-        ? assistantErrorMessage
-        : await step.run("generate-response", async () => {
-            try {
-              return await callLLMSimple(RESPONSE_PROMPT, agentState.summary);
-            } catch (error: unknown) {
-              console.error("Response generation error:", error);
-              return "Successfully generated your code.";
-            }
+      const [fragmentTitleOutput, responseOutput] = assistantErrorMessage
+        ? ["Generation Error", assistantErrorMessage]
+        : await step.run("generate-metadata", async () => {
+            const [title, response] = await Promise.all([
+              callLLMWithFallbacks(
+                [
+                  { role: "system", content: FRAGMENT_TITLE_PROMPT },
+                  { role: "user", content: agentState.summary },
+                ],
+                { temperature: 0.2, max_tokens: 40 },
+              ).catch((err) => {
+                console.error("Fragment title generation error:", err);
+                return "Generated Page";
+              }),
+              callLLMWithFallbacks(
+                [
+                  { role: "system", content: RESPONSE_PROMPT },
+                  { role: "user", content: agentState.summary },
+                ],
+                { temperature: 0.3, max_tokens: 60 },
+              ).catch((err) => {
+                console.error("Response generation error:", err);
+                return "Successfully generated your code.";
+              }),
+            ]);
+            return [
+              title.trim() || "Generated Page",
+              response.trim() || "Successfully generated your code.",
+            ];
           });
 
       const result = await step.run("save-result", async () => {

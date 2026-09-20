@@ -105,9 +105,9 @@ export const Messageform = ({ projectId }: Props) => {
               className="pt-4 resize-none border-none w-full outline-none bg-transparent "
               placeholder="What would you like to build"
               onKeyDown={(e) => {
-                if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+                if (e.key === "Enter" && !e.shiftKey) {
                   e.preventDefault();
-                  form.handleSubmit(onSubmit)(e);
+                  form.handleSubmit(onSubmit)();
                 }
               }}
             />
@@ -115,11 +115,16 @@ export const Messageform = ({ projectId }: Props) => {
         />
 
         <div className="flex gap-x-2 items-end justify-between pt-2">
-          <div className="text-[10px] text-muted-foreground font-mono">
-            <kbd className="ml-auto pointer-events-auto inline-flex h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground">
-              <span>&#8984;</span>Enter
+          <div className="text-[10px] text-muted-foreground font-mono flex items-center gap-1.5 flex-wrap">
+            <kbd className="inline-flex h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground">
+              Enter
             </kbd>
-            &nbsp; to submit
+            <span>to submit</span>
+            <span className="text-muted-foreground/40">·</span>
+            <kbd className="inline-flex h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground">
+              Shift+Enter
+            </kbd>
+            <span>new line</span>
           </div>
           <Button
             disabled={isButtonDisabled}
