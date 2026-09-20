@@ -10,11 +10,16 @@ const isPublicRoute = createRouteMatcher([
   "/projects(.*)",
 ]);
 
-export default clerkMiddleware(async (auth, req) => {
-  if (!isPublicRoute(req)) {
-    await auth.protect();
+export default clerkMiddleware(
+  async (auth, req) => {
+    if (!isPublicRoute(req)) {
+      await auth.protect();
+    }
+  },
+  {
+    clockSkewInMs: 60 * 1000,
   }
-});
+);
 
 export const config = {
   matcher: [

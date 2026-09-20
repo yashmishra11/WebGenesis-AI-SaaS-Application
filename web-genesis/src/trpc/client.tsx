@@ -53,6 +53,38 @@ export function TRPCReactProvider(
         httpBatchLink({
           transformer: superjson,
           url: getUrl(),
+          fetch: async (url, options) => {
+            const res = await fetch(url, options);
+            const contentType = res.headers.get("content-type") || "";
+            if (!contentType.includes("application/json")) {
+              const text = await res.text();
+              const cleanText = text
+                .replace(/<[^>]*>?/gm, " ")
+                .replace(/\s+/g, " ")
+                .trim();
+              return new Response(
+                JSON.stringify([
+                  {
+                    error: {
+                      json: {
+                        message: `Server returned non-JSON response (${res.status}): ${cleanText.slice(0, 160) || res.statusText || "Unexpected response"}`,
+                        code: -32603,
+                        data: {
+                          code: "INTERNAL_SERVER_ERROR",
+                          httpStatus: res.status,
+                        },
+                      },
+                    },
+                  },
+                ]),
+                {
+                  status: res.status,
+                  headers: { "Content-Type": "application/json" },
+                }
+              );
+            }
+            return res;
+          },
         }),
       ],
     })

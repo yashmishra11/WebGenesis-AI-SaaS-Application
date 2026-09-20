@@ -75,12 +75,29 @@ export const projectsRouter = createTRPCRouter({
     .mutation(async ({ input, ctx }) => {
       try {
         await consumeCredits();
-      } catch (error) {
-        if (error instanceof Error) {
-          throw new TRPCError({ code: "BAD_REQUEST", message: "Something went wrong" });
-        } else {
-          throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: "You have run out of credits" });
+      } catch (error: unknown) {
+        const rateLimitErr =
+          typeof error === "object" && error !== null
+            ? (error as { msBeforeNext?: number; message?: string })
+            : null;
+
+        if (rateLimitErr?.msBeforeNext !== undefined) {
+          throw new TRPCError({
+            code: "TOO_MANY_REQUESTS",
+            message: `You have run out of credits. Try again in ${Math.ceil(
+              rateLimitErr.msBeforeNext / 1000 / 60 / 60 / 24,
+            )} days.`,
+          });
         }
+
+        console.error("❌ Error in consumeCredits:", error);
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message:
+            error instanceof Error
+              ? error.message
+              : "Database connection failed. Please ensure DATABASE_URL is configured.",
+        });
       }
 
       const createProject = await prisma.project.create({
@@ -188,10 +205,26 @@ export const projectsRouter = createTRPCRouter({
 
       try {
         await consumeGuestCredits(guestId);
-      } catch {
+      } catch (error: unknown) {
+        const rateLimitErr =
+          typeof error === "object" && error !== null
+            ? (error as { msBeforeNext?: number; message?: string })
+            : null;
+
+        if (rateLimitErr?.msBeforeNext !== undefined) {
+          throw new TRPCError({
+            code: "TOO_MANY_REQUESTS",
+            message: "You've used all your free generations. Sign in to continue.",
+          });
+        }
+
+        console.error("❌ Error in consumeGuestCredits:", error);
         throw new TRPCError({
-          code: "TOO_MANY_REQUESTS",
-          message: "You've used all your free generations. Sign in to continue.",
+          code: "INTERNAL_SERVER_ERROR",
+          message:
+            error instanceof Error
+              ? error.message
+              : "Database connection failed. Please ensure DATABASE_URL is configured.",
         });
       }
 

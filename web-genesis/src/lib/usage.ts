@@ -8,18 +8,32 @@ const GUEST_POINTS = 2;
 const DURATION = 30 * 24 * 60 * 60; // 30 days
 const GENERATION_COST = 1;
 
+const limiters = new Map<number, RateLimiterPrisma>();
+
+function getOrCreateLimiter(points: number) {
+  let limiter = limiters.get(points);
+  if (!limiter) {
+    limiter = new RateLimiterPrisma({
+      storeClient: prisma,
+      tableName: "Usage",
+      points,
+      duration: DURATION,
+    });
+    const timer = (limiter as unknown as { _clearExpiredTimeoutId?: NodeJS.Timeout })._clearExpiredTimeoutId;
+    if (timer) {
+      clearTimeout(timer);
+    }
+    limiters.set(points, limiter);
+  }
+  return limiter;
+}
+
 export async function getUsageTracker() {
   const { has } = await auth();
   const hasProAccess = has({ plan: "pro" });
-
-  const usageTracker = new RateLimiterPrisma({
-    storeClient: prisma,
-    tableName: "Usage",
-    points: hasProAccess ? PRO_POINTS : FREE_POINTS,
-    duration: DURATION,
-  });
-  return usageTracker;
+  return getOrCreateLimiter(hasProAccess ? PRO_POINTS : FREE_POINTS);
 }
+
 export async function consumeCredits() {
   const { userId } = await auth();
   if (!userId) {
@@ -41,22 +55,12 @@ export async function getUsageStatus() {
 }
 
 export async function consumeGuestCredits(guestId: string) {
-  const usageTracker = new RateLimiterPrisma({
-    storeClient: prisma,
-    tableName: "Usage",
-    points: GUEST_POINTS,
-    duration: DURATION,
-  });
+  const usageTracker = getOrCreateLimiter(GUEST_POINTS);
   return usageTracker.consume(`guest_${guestId}`, GENERATION_COST);
 }
 
 export async function getGuestUsageStatus(guestId: string) {
-  const usageTracker = new RateLimiterPrisma({
-    storeClient: prisma,
-    tableName: "Usage",
-    points: GUEST_POINTS,
-    duration: DURATION,
-  });
+  const usageTracker = getOrCreateLimiter(GUEST_POINTS);
   return usageTracker.get(`guest_${guestId}`);
 }
 

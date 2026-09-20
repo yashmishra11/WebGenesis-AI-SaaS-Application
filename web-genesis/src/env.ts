@@ -2,28 +2,39 @@ import "server-only";
 
 import { z } from "zod";
 
+const emptyToUndefined = (val: unknown) =>
+  typeof val === "string" && val.trim() === "" ? undefined : val;
+
+const optionalString = z.preprocess(
+  emptyToUndefined,
+  z.string().min(1).optional(),
+);
+
 const serverEnvSchema = z.object({
-  DATABASE_URL: z.url(),
-  NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: z.string().min(1).optional(),
-  CLERK_SECRET_KEY: z.string().min(1),
-  INNGEST_EVENT_KEY: z.string().min(1).optional(),
-  INNGEST_SIGNING_KEY: z.string().min(1).optional(),
-  GROQ_API_KEY: z.string().min(1),
-  GROQ_MODEL: z.string().min(1).optional(),
-  OPENROUTER_API_KEY: z.string().min(1).optional(),
-  OPENROUTER_MODEL: z.string().min(1).optional(),
-  GEMINI_API_KEY: z.string().min(1).optional(),
-  GEMINI_MODEL: z.string().min(1).optional(),
-  OPENAI_API_KEY: z.string().min(1).optional(),
-  OPENAI_MODEL: z.string().min(1).optional(),
-  E2B_API_KEY: z.string().min(1),
-  E2B_TEMPLATE: z.string().min(1).optional(),
-  NEXT_PUBLIC_APP_URL: z.url(),
+  DATABASE_URL: z.preprocess(emptyToUndefined, z.string().min(1)),
+  NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: optionalString,
+  CLERK_SECRET_KEY: z.preprocess(emptyToUndefined, z.string().min(1)),
+  INNGEST_EVENT_KEY: optionalString,
+  INNGEST_SIGNING_KEY: optionalString,
+  GROQ_API_KEY: optionalString,
+  GROQ_MODEL: optionalString,
+  OPENROUTER_API_KEY: optionalString,
+  OPENROUTER_MODEL: optionalString,
+  GEMINI_API_KEY: optionalString,
+  GEMINI_MODEL: optionalString,
+  OPENAI_API_KEY: optionalString,
+  OPENAI_MODEL: optionalString,
+  E2B_API_KEY: optionalString,
+  E2B_TEMPLATE: optionalString,
+  NEXT_PUBLIC_APP_URL: z.preprocess(
+    emptyToUndefined,
+    z.string().url().default("http://localhost:3000"),
+  ),
   NODE_ENV: z
     .enum(["development", "production", "test"])
     .optional()
     .default("development"),
-  INNGEST_DEV: z.string().optional(),
+  INNGEST_DEV: optionalString,
 });
 
 const parsed = serverEnvSchema.safeParse(process.env);
