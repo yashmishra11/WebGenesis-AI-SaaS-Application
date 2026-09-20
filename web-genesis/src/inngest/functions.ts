@@ -546,9 +546,18 @@ export const codeAgentFunction = inngest.createFunction(
     const userPrompt = event?.data?.value ?? "";
     const projectId = event?.data?.projectId;
 
+    const initialProjectState = await prisma.project.findUnique({
+      where: { id: projectId },
+      select: { cancelled: true },
+    });
+    if (initialProjectState?.cancelled) {
+      return { cancelled: true };
+    }
+
     try {
       const sandboxId = await step.run("create-sandbox", async () => {
-        const s = await Sandbox.create("web-test");
+        const template = process.env.E2B_TEMPLATE || "web-test";
+        const s = await Sandbox.create(template);
         await s.setTimeout(SANDBOX_TIMEOUT);
         return s.sandboxId;
       });
@@ -744,6 +753,19 @@ export const codeAgentFunction = inngest.createFunction(
         summary: finalSummary,
         files: filesWithContent,
       };
+
+      const postLoopProjectState = await prisma.project.findUnique({
+        where: { id: projectId },
+        select: { cancelled: true },
+      });
+      if (postLoopProjectState?.cancelled) {
+        return {
+          cancelled: true,
+          summary: "Generation was stopped.",
+          sandboxId,
+          sandBoxUrl,
+        };
+      }
 
       const fragmentTitleOutput = assistantErrorMessage
         ? "Generation Error"
