@@ -20,7 +20,18 @@ type ModelMessage = {
   content: string;
 };
 
-const GROQ_MODEL = env.GROQ_MODEL ?? "llama-3.3-70b-versatile";
+const DEFAULT_GROQ_MODELS = [
+  "groq/compound",
+  "openai/gpt-oss-120b",
+  "openai/gpt-oss-20b",
+  "qwen/qwen3.8-27b",
+];
+const GROQ_MODELS = env.GROQ_MODEL
+  ? [
+      env.GROQ_MODEL,
+      ...DEFAULT_GROQ_MODELS.filter((model) => model !== env.GROQ_MODEL),
+    ]
+  : DEFAULT_GROQ_MODELS;
 const DEFAULT_OPENROUTER_MODELS = [
   "meta-llama/llama-3.3-70b-instruct:free",
   "z-ai/glm-4.5-air:free",
@@ -180,18 +191,52 @@ async function callLLMWithFallbacks(
   const { temperature = 0.7, max_tokens = 4000 } = options;
   const failures: string[] = [];
 
-  try {
-    const response = await groq.chat.completions.create({
-      model: GROQ_MODEL,
-      messages,
-      temperature,
-      max_tokens,
-    });
-    return response.choices[0].message.content || "";
-  } catch (error) {
-    const detail = getProviderErrorMessage(error);
-    failures.push(`Groq (${GROQ_MODEL}): ${detail}`);
-    console.warn(`[LLM] Groq (${GROQ_MODEL}) failed → ${detail}`);
+function parseGroqWaitMs(detail: string): number | null {
+  const match = detail.match(/try again in ([0-9.]+)s/i);
+  if (match?.[1]) {
+    return Math.ceil(parseFloat(match[1]) * 1000) + 1000;
+  }
+  return null;
+}
+
+  for (const model of GROQ_MODELS) {
+    try {
+      const effectiveMaxTokens = model.includes("qwen")
+        ? Math.min(max_tokens, 1000)
+        : Math.min(max_tokens, 2048);
+
+      const response = await groq.chat.completions.create({
+        model,
+        messages,
+        temperature,
+        max_tokens: effectiveMaxTokens,
+      });
+      return response.choices[0].message.content || "";
+    } catch (error) {
+      const detail = getProviderErrorMessage(error);
+      failures.push(`Groq (${model}): ${detail}`);
+      console.warn(`[LLM] Groq (${model}) failed → ${detail}`);
+
+      const waitMs = parseGroqWaitMs(detail);
+      if (waitMs && waitMs <= 20000) {
+        console.warn(
+          `[LLM] Groq (${model}) rate limit cooldown: waiting ${waitMs}ms before retry...`,
+        );
+        await new Promise((resolve) => setTimeout(resolve, waitMs));
+        try {
+          const retryResponse = await groq.chat.completions.create({
+            model,
+            messages,
+            temperature,
+            max_tokens: model.includes("qwen") ? Math.min(max_tokens, 1000) : Math.min(max_tokens, 2048),
+          });
+          return retryResponse.choices[0].message.content || "";
+        } catch (retryErr) {
+          const retryDetail = getProviderErrorMessage(retryErr);
+          failures.push(`Groq (${model}) retry: ${retryDetail}`);
+        }
+      }
+    }
   }
 
   if (openrouter) {
@@ -663,7 +708,7 @@ export const codeAgentFunction = inngest.createFunction(
         try {
           raw = await callLLMWithFallbacks(agentMessages, {
             temperature: 0.4,
-            max_tokens: 2500,
+            max_tokens: 2048,
           });
         } catch (error: unknown) {
           if (isRateLimitError(error)) {

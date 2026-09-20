@@ -3,7 +3,7 @@ import { Fragment, MessageRole, MessageType } from "@prisma/client";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import Image from "next/image";
-import { AlertTriangleIcon, Clock3Icon, Code2Icon, CrownIcon } from "lucide-react";
+import { AlertTriangleIcon, Clock3Icon, Code2Icon, CrownIcon, SparklesIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 interface Messagecardprops {
@@ -14,6 +14,8 @@ interface Messagecardprops {
   isActiveFragment: boolean;
   onFragmentClick: (fragment: Fragment) => void;
   type: MessageType;
+  onRegenerate?: (stylePrompt?: string) => void;
+  isGenerating?: boolean;
 }
 
 interface Usermessage {
@@ -27,6 +29,8 @@ interface AssistantMessage {
   isActiveFragment: boolean;
   onFragmentClick: (fragment: Fragment) => void;
   type: MessageType;
+  onRegenerate?: (stylePrompt?: string) => void;
+  isGenerating?: boolean;
 }
 
 interface LocalFragment {
@@ -80,6 +84,8 @@ const AssistantMessage = ({
   isActiveFragment,
   onFragmentClick,
   type,
+  onRegenerate,
+  isGenerating,
 }: AssistantMessage) => {
   const { isRateLimit, retryAfter } = parseRateLimitError(content);
   return (
@@ -149,11 +155,26 @@ const AssistantMessage = ({
         )}
 
         {fragment && type === "RESULT" && (
-          <Fragmentcard
-            fragment={fragment}
-            isActiveFragment={isActiveFragment}
-            onFragmentClick={onFragmentClick}
-          />
+          <div className="flex flex-wrap items-center gap-2">
+            <Fragmentcard
+              fragment={fragment}
+              isActiveFragment={isActiveFragment}
+              onFragmentClick={onFragmentClick}
+            />
+            {onRegenerate && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1.5 text-xs text-muted-foreground hover:text-foreground h-12 px-3 border-dashed"
+                onClick={() => onRegenerate()}
+                disabled={isGenerating}
+                title="Regenerate this page with a fresh layout, colors, and font styling"
+              >
+                <SparklesIcon className="size-3.5 text-primary" />
+                <span>Regenerate Variation</span>
+              </Button>
+            )}
+          </div>
         )}
       </div>
     </div>
@@ -178,6 +199,8 @@ export const Messagecard = ({
   isActiveFragment,
   onFragmentClick,
   type,
+  onRegenerate,
+  isGenerating,
 }: Messagecardprops) => {
   if (role === MessageRole.ASSISTANT) {
     return (
@@ -188,6 +211,8 @@ export const Messagecard = ({
         isActiveFragment={isActiveFragment}
         onFragmentClick={onFragmentClick}
         type={type}
+        onRegenerate={onRegenerate}
+        isGenerating={isGenerating}
       />
     );
   }

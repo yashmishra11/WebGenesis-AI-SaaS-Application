@@ -8,6 +8,10 @@ import { Fragment } from "@prisma/client";
 import { Button } from "@/components/ui/button";
 import { Loader2Icon, SquareIcon } from "lucide-react";
 
+import { useClerk } from "@clerk/nextjs";
+import { useRouter } from "next/navigation";
+import { toast } from "sonner";
+
 const SLOW_GENERATION_MS = 45_000;
 const PENDING_TIMEOUT_MS = 5 * 60_000;
 
@@ -24,11 +28,44 @@ export const MessagesContainer = ({
 }: Props) => {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
+  const router = useRouter();
+  const clerk = useClerk();
   const bottomRef = useRef<HTMLDivElement>(null);
   const lastMessageIdRef = useRef<string | null>(null);
   const statusMessageRef = useRef<string | null>(null);
   const [now, setNow] = useState(Date.now());
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
+
+  const createMessage = useMutation(
+    trpc.messages.create.mutationOptions({
+      onSuccess: () => {
+        queryClient.invalidateQueries(
+          trpc.messages.getMany.queryOptions({ projectId })
+        );
+        queryClient.invalidateQueries(trpc.usage.status.queryOptions());
+      },
+      onError: (error) => {
+        if (error?.data?.code === "UNAUTHORIZED") {
+          clerk.openSignIn();
+          return;
+        }
+        toast.error(error.message);
+        if (error.data?.code === "TOO_MANY_REQUESTS") {
+          router.push("/pricing");
+        }
+      },
+    })
+  );
+
+  const handleRegenerate = (stylePrompt?: string) => {
+    const prompt =
+      stylePrompt ||
+      "Regenerate a creative design variation of this webpage. Keep the exact same features and functionality, but redesign the visual aesthetic: vary the color palette, typography hierarchy, component alignment, and layout arrangement for a fresh look.";
+    createMessage.mutate({
+      projectId,
+      value: prompt,
+    });
+  };
 
   const cancelGeneration = useMutation(
     trpc.projects.cancel.mutationOptions({
@@ -123,18 +160,26 @@ export const MessagesContainer = ({
     <div className="flex flex-col flex-1 min-h-0 ">
       <div className="flex-1 min-h-0 overflow-y-auto  ">
         <div className="pt-2 pr-1">
-          {messages.map((msg) => (
-            <Messagecard
-              key={msg.id}
-              content={msg.content}
-              role={msg.role}
-              fragment={msg.fragment}
-              createdAt={msg.createdAt}
-              isActiveFragment={activeFragment?.id === msg.fragment?.id}
-              onFragmentClick={() => setActiveFragment(msg.fragment)}
-              type={msg.type}
-            />
-          ))}
+          {messages.map((msg, index) => {
+            const isLatestAssistant =
+              msg.role === "ASSISTANT" &&
+              index === messages.findLastIndex((m) => m.role === "ASSISTANT");
+
+            return (
+              <Messagecard
+                key={msg.id}
+                content={msg.content}
+                role={msg.role}
+                fragment={msg.fragment}
+                createdAt={msg.createdAt}
+                isActiveFragment={activeFragment?.id === msg.fragment?.id}
+                onFragmentClick={() => setActiveFragment(msg.fragment)}
+                type={msg.type}
+                onRegenerate={isLatestAssistant ? handleRegenerate : undefined}
+                isGenerating={isLastMessageFromUser || createMessage.isPending}
+              />
+            );
+          })}
           {isLastMessageFromUser && (
             <MessageLoading isSlow={isSlow} isTimedOut={isTimedOut} />
           )}
