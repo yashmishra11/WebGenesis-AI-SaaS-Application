@@ -1,7 +1,9 @@
+"use client";
+
 import { useSuspenseQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Messagecard } from "./message-card";
 import { Messageform } from "./message.form";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useTRPC } from "@/trpc/client";
 import { MessageLoading } from "./message-loading";
 import { Fragment } from "@prisma/client";
@@ -35,6 +37,7 @@ export const MessagesContainer = ({
   const statusMessageRef = useRef<string | null>(null);
   const [now, setNow] = useState(Date.now());
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  const [activeVersionMap, setActiveVersionMap] = useState<Record<string, number>>({});
 
   const createMessage = useMutation(
     trpc.messages.create.mutationOptions({
@@ -77,6 +80,7 @@ export const MessagesContainer = ({
       },
     })
   );
+
   const { data: messages } = useSuspenseQuery(
     trpc.messages.getMany.queryOptions(
       {
@@ -93,6 +97,83 @@ export const MessagesContainer = ({
       },
     ),
   );
+
+  type MessageItem = (typeof messages)[number];
+
+  interface Turn {
+    id: string;
+    baseUserMessage: MessageItem;
+    variations: {
+      userMessage: MessageItem;
+      assistantMessage?: MessageItem;
+    }[];
+  }
+
+  // Group messages into conversation turns with variations
+  const turns = useMemo(() => {
+    const result: Turn[] = [];
+    let currentTurn: Turn | null = null;
+
+    for (const message of messages) {
+      if (message.role === "USER") {
+        const isRegen =
+          message.content.trim().toLowerCase().startsWith("regenerate") &&
+          currentTurn !== null;
+
+        if (isRegen && currentTurn) {
+          currentTurn.variations.push({ userMessage: message });
+        } else {
+          currentTurn = {
+            id: message.id,
+            baseUserMessage: message,
+            variations: [{ userMessage: message }],
+          };
+          result.push(currentTurn);
+        }
+      } else if (message.role === "ASSISTANT") {
+        if (currentTurn) {
+          const lastVariation =
+            currentTurn.variations[currentTurn.variations.length - 1];
+          if (lastVariation) {
+            lastVariation.assistantMessage = message;
+          }
+        } else {
+          result.push({
+            id: message.id,
+            baseUserMessage: {
+              ...message,
+              role: "USER",
+              content: "Initial setup",
+            } as MessageItem,
+            variations: [
+              {
+                userMessage: {
+                  ...message,
+                  role: "USER",
+                  content: "Initial setup",
+                } as MessageItem,
+                assistantMessage: message,
+              },
+            ],
+          });
+        }
+      }
+    }
+
+    return result;
+  }, [messages]);
+
+  const handleVersionChange = (turnId: string, versionIndex: number, turn: Turn) => {
+    setActiveVersionMap((prev) => ({
+      ...prev,
+      [turnId]: versionIndex,
+    }));
+
+    const variation = turn.variations[versionIndex];
+    if (variation?.assistantMessage?.fragment) {
+      setActiveFragment(variation.assistantMessage.fragment);
+    }
+  };
 
   useEffect(() => {
     const lastMessage = messages.findLast(
@@ -160,26 +241,64 @@ export const MessagesContainer = ({
     <div className="flex flex-col flex-1 min-h-0 ">
       <div className="flex-1 min-h-0 overflow-y-auto  ">
         <div className="pt-2 pr-1">
-          {messages.map((msg, index) => {
-            const isLatestAssistant =
-              msg.role === "ASSISTANT" &&
-              index === messages.findLastIndex((m) => m.role === "ASSISTANT");
+          {turns.map((turn, turnIndex) => {
+            const isLatestTurn = turnIndex === turns.length - 1;
+            const totalVersions = turn.variations.length;
+            const selectedIndex =
+              activeVersionMap[turn.id] !== undefined
+                ? activeVersionMap[turn.id]
+                : totalVersions - 1;
+            const clampedIndex = Math.min(
+              Math.max(0, selectedIndex),
+              totalVersions - 1,
+            );
+            const activeVariation = turn.variations[clampedIndex];
 
             return (
-              <Messagecard
-                key={msg.id}
-                content={msg.content}
-                role={msg.role}
-                fragment={msg.fragment}
-                createdAt={msg.createdAt}
-                isActiveFragment={activeFragment?.id === msg.fragment?.id}
-                onFragmentClick={() => setActiveFragment(msg.fragment)}
-                type={msg.type}
-                onRegenerate={isLatestAssistant ? handleRegenerate : undefined}
-                isGenerating={isLastMessageFromUser || createMessage.isPending}
-              />
+              <div key={turn.id} className="flex flex-col">
+                {/* User Prompt with version switcher */}
+                <Messagecard
+                  content={turn.baseUserMessage.content}
+                  role="USER"
+                  fragment={null}
+                  createdAt={turn.baseUserMessage.createdAt}
+                  isActiveFragment={false}
+                  onFragmentClick={() => {}}
+                  type={turn.baseUserMessage.type}
+                  totalVersions={totalVersions}
+                  currentVersion={clampedIndex + 1}
+                  onVersionChange={(newIdx) =>
+                    handleVersionChange(turn.id, newIdx, turn)
+                  }
+                />
+
+                {/* Assistant response for the active variation */}
+                {activeVariation?.assistantMessage && (
+                  <Messagecard
+                    content={activeVariation.assistantMessage.content}
+                    role="ASSISTANT"
+                    fragment={activeVariation.assistantMessage.fragment}
+                    createdAt={activeVariation.assistantMessage.createdAt}
+                    isActiveFragment={
+                      activeFragment?.id ===
+                      activeVariation.assistantMessage.fragment?.id
+                    }
+                    onFragmentClick={() =>
+                      setActiveFragment(
+                        activeVariation.assistantMessage?.fragment ?? null,
+                      )
+                    }
+                    type={activeVariation.assistantMessage.type}
+                    onRegenerate={isLatestTurn ? handleRegenerate : undefined}
+                    isGenerating={
+                      isLastMessageFromUser || createMessage.isPending
+                    }
+                  />
+                )}
+              </div>
             );
           })}
+
           {isLastMessageFromUser && (
             <MessageLoading isSlow={isSlow} isTimedOut={isTimedOut} />
           )}
