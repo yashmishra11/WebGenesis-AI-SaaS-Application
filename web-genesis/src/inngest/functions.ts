@@ -204,7 +204,7 @@ function parseGroqWaitMs(detail: string): number | null {
     try {
       const effectiveMaxTokens = model.includes("qwen")
         ? Math.min(max_tokens, 1000)
-        : Math.min(max_tokens, 2048);
+        : Math.min(max_tokens, 4096);
 
       const response = await groq.chat.completions.create({
         model,
@@ -229,7 +229,7 @@ function parseGroqWaitMs(detail: string): number | null {
             model,
             messages,
             temperature,
-            max_tokens: model.includes("qwen") ? Math.min(max_tokens, 1000) : Math.min(max_tokens, 2048),
+            max_tokens: model.includes("qwen") ? Math.min(max_tokens, 1000) : Math.min(max_tokens, 4096),
           });
           return retryResponse.choices[0].message.content || "";
         } catch (retryErr) {
@@ -372,6 +372,130 @@ function getJSONCandidates(rawText: string) {
   return [...new Set(candidates)];
 }
 
+function extractToolCallFromMarkdown(rawText: string): ToolCall | null {
+  // 1. Check if any markdown code block contains a valid JSON tool call
+  const jsonBlocks = [...rawText.matchAll(/```(?:json)?\s*(\{[\s\S]*?\})\s*```/gi)];
+  for (const m of jsonBlocks) {
+    try {
+      const extracted = JSON.parse(m[1].trim());
+      const parsed = toolCallSchema.safeParse(extracted);
+      if (parsed.success) return parsed.data;
+    } catch {
+      continue;
+    }
+  }
+
+  // 2. Extract code blocks (tsx, jsx, typescript, javascript, or untagged)
+  const codeBlockRegex = /```(?:tsx|jsx|typescript|javascript|react)?\s*([\s\S]*?)```/gi;
+  const blocks = [...rawText.matchAll(codeBlockRegex)];
+
+  const candidateFiles: { path: string; content: string }[] = [];
+
+  for (const match of blocks) {
+    const code = match[1].trim();
+    // Check if this block looks like a React/Next.js page or component
+    const isReactCode =
+      code.includes("export default function") ||
+      code.includes("export default") ||
+      (code.includes("function") && code.includes("return (")) ||
+      (code.includes("const ") && (code.includes("=> {") || code.includes("=> (")) && code.includes("return (")) ||
+      code.includes("<div") ||
+      code.includes("<main");
+
+    if (!isReactCode) continue;
+
+    // Check if there's an explicit file path in comments (e.g. // app/page.tsx or // components/FileManager.tsx)
+    const pathMatch = code.match(/^\s*\/\/\s*([a-zA-Z0-9_\-./]+\.(?:tsx|jsx|ts|js))/m);
+    let filePath = pathMatch ? pathMatch[1].trim() : "";
+
+    if (!filePath) {
+      if (
+        code.includes("export default function") ||
+        code.includes("export default") ||
+        code.includes("function Page") ||
+        code.includes("function Home") ||
+        candidateFiles.length === 0
+      ) {
+        filePath = "app/page.tsx";
+      } else {
+        filePath = `components/component-${candidateFiles.length + 1}.tsx`;
+      }
+    }
+
+    let processedCode = code;
+    if (
+      !processedCode.includes('"use client"') &&
+      !processedCode.includes("'use client'")
+    ) {
+      processedCode = `"use client";\n\n${processedCode}`;
+    }
+
+    processedCode = autoFixJsxCode(processedCode);
+
+    if (!candidateFiles.some((f) => f.path === filePath)) {
+      candidateFiles.push({ path: filePath, content: processedCode });
+    }
+  }
+
+  if (candidateFiles.length > 0) {
+    // Ensure at least one file is designated as app/page.tsx
+    if (!candidateFiles.some((f) => f.path === "app/page.tsx")) {
+      candidateFiles[0].path = "app/page.tsx";
+    }
+
+    console.log(
+      `[Parser] Extracted ${candidateFiles.length} file(s) from markdown response:`,
+      candidateFiles.map((f) => f.path),
+    );
+
+    return {
+      tool: "createOrUpdateFiles",
+      args: {
+        files: candidateFiles,
+      },
+    };
+  }
+
+  // 3. Fallback: Detect raw TSX in unfenced text
+  const hasReactSigns =
+    (rawText.includes("export default function") || rawText.includes("export default")) &&
+    (rawText.includes("<div") || rawText.includes("<main") || rawText.includes("return ("));
+
+  if (hasReactSigns) {
+    const startIdx = Math.min(
+      ...[
+        rawText.indexOf('"use client"'),
+        rawText.indexOf("'use client'"),
+        rawText.indexOf("import "),
+        rawText.indexOf("export default"),
+      ].filter((idx) => idx >= 0),
+    );
+
+    if (startIdx >= 0) {
+      let rawCode = rawText.slice(startIdx).trim();
+      const lastBrace = rawCode.lastIndexOf("}");
+      if (lastBrace > 0) {
+        rawCode = rawCode.slice(0, lastBrace + 1);
+      }
+
+      if (!rawCode.includes('"use client"') && !rawCode.includes("'use client'")) {
+        rawCode = `"use client";\n\n${rawCode}`;
+      }
+      rawCode = autoFixJsxCode(rawCode);
+
+      console.log("[Parser] Extracted raw TSX from unfenced response into app/page.tsx");
+      return {
+        tool: "createOrUpdateFiles",
+        args: {
+          files: [{ path: "app/page.tsx", content: rawCode }],
+        },
+      };
+    }
+  }
+
+  return null;
+}
+
 function parseToolCall(rawText: string): ToolCall | null {
   for (const candidate of getJSONCandidates(rawText)) {
     try {
@@ -383,6 +507,12 @@ function parseToolCall(rawText: string): ToolCall | null {
     } catch {
       continue;
     }
+  }
+
+  // Fallback: extract code blocks from conversational markdown response
+  const extractedFromMarkdown = extractToolCallFromMarkdown(rawText);
+  if (extractedFromMarkdown) {
+    return extractedFromMarkdown;
   }
 
   return null;
@@ -775,7 +905,7 @@ export const codeAgentFunction = inngest.createFunction(
         try {
           raw = await callLLMWithFallbacks(agentMessages, {
             temperature: 0.35,
-            max_tokens: 2048,
+            max_tokens: 4096,
           });
         } catch (error: unknown) {
           if (isRateLimitError(error)) {
@@ -816,7 +946,7 @@ export const codeAgentFunction = inngest.createFunction(
           try {
             const raw2 = await callLLMWithFallbacks(agentMessages, {
               temperature: 0.65,
-              max_tokens: 2048,
+              max_tokens: 4096,
             });
             const parsed2 = parseToolCall(raw2);
             if (parsed2 && parsed2.tool === "createOrUpdateFiles") {
