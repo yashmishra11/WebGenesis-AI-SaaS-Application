@@ -72,10 +72,14 @@ export const ProjectForm = () => {
   const isButtonDisabled = isPending || !form.formState.isValid;
 
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
-    if (isSignedIn) {
-      await createProject.mutateAsync({ value: values.value });
-    } else {
-      await createGuestProject.mutateAsync({ value: values.value });
+    try {
+      if (isSignedIn) {
+        await createProject.mutateAsync({ value: values.value });
+      } else {
+        await createGuestProject.mutateAsync({ value: values.value });
+      }
+    } catch {
+      // Error is handled by onError callback in useMutation
     }
   };
 

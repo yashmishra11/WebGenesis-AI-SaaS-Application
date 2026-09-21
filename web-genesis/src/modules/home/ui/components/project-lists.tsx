@@ -19,6 +19,7 @@ export const ProjectsList = () => {
     data: projects,
     isLoading,
     isError,
+    error,
     refetch,
   } = useQuery({
     ...queryOptions,
@@ -51,7 +52,7 @@ export const ProjectsList = () => {
             Unable to connect to database
           </p>
           <p className="text-xs text-muted-foreground">
-            Please configure your valid DATABASE_URL in the .env file.
+            {error?.message || "Please verify your DATABASE_URL in Vercel environment variables."}
           </p>
           <Button
             variant="outline"

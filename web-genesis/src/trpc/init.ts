@@ -20,6 +20,18 @@ export type Context = Awaited<ReturnType<typeof createTRPCContext>>;
  */
 const t = initTRPC.context<Context>().create({
   transformer: superjson,
+  errorFormatter({ shape, error }) {
+    return {
+      ...shape,
+      message:
+        error instanceof TRPCError && error.message
+          ? error.message
+          : shape.message,
+      data: {
+        ...shape.data,
+      },
+    };
+  },
 });
 /**
  * Export reusable router and procedure helpers

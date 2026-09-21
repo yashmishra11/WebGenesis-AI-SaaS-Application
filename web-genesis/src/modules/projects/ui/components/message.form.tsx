@@ -73,10 +73,14 @@ export const Messageform = ({ projectId }: Props) => {
   const isButtonDisabled = isPending || !form.formState.isValid;
 
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
-    await createMessage.mutateAsync({
-      value: values.value,
-      projectId,
-    });
+    try {
+      await createMessage.mutateAsync({
+        value: values.value,
+        projectId,
+      });
+    } catch {
+      // Error is handled by onError callback in useMutation
+    }
   };
 
   return (
