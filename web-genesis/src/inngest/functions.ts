@@ -648,8 +648,45 @@ async function runTerminal(command: string, sandbox: Sandbox) {
 }
 
 function autoFixJsxCode(content: string): string {
-  // Fix unclosed JSX comments like {/* comment */ without closing }
-  return content.replace(/(\{\/\*[\s\S]*?\*\/)(?!\})/g, "$1}");
+  if (!content || typeof content !== "string") return "";
+
+  let code = content.trim();
+
+  // 1. Strip leading/trailing escaped or unescaped quotes if the whole content was wrapped
+  if (
+    (code.startsWith('"') && code.endsWith('"')) ||
+    (code.startsWith("'") && code.endsWith("'"))
+  ) {
+    try {
+      code = JSON.parse(code);
+    } catch {
+      code = code.slice(1, -1);
+    }
+  } else if (code.startsWith('\\"') && code.endsWith('\\"')) {
+    code = code.slice(2, -2);
+  }
+
+  // 2. Unescape double-escaped characters from LLM JSON responses:
+  // \" -> ", \n -> newline, \t -> tab, \r -> return
+  if (code.includes('\\"') || code.includes("\\n") || code.includes("\\t") || code.includes("\\r")) {
+    code = code
+      .replace(/\\"/g, '"')
+      .replace(/\\n/g, "\n")
+      .replace(/\\t/g, "\t")
+      .replace(/\\r/g, "\r");
+  }
+
+  // 3. Clean up any remaining literal backslash-escaped quotes (e.g. from \"react\" or className=\"...\")
+  code = code.replace(/\\"/g, '"');
+
+  // 4. Strip accidental markdown code fences if wrapped inside the content string
+  code = code.replace(/^```(?:tsx|jsx|typescript|javascript|react)?\s*/i, "");
+  code = code.replace(/\s*```$/i, "");
+
+  // 5. Fix unclosed JSX comments like {/* comment */ without closing }
+  code = code.replace(/(\{\/\*[\s\S]*?\*\/)(?!\})/g, "$1}");
+
+  return code.trim();
 }
 
 function scoreCandidateCode(code: string): number {

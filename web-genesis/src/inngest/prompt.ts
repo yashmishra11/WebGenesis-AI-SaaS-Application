@@ -76,7 +76,7 @@ You MUST respond with ONLY a valid JSON object matching this schema in Step 1:
     "files": [
       {
         "path": "app/page.tsx",
-        "content": "\\"use client\\";\\n\\nimport React, { useState, useMemo } from 'react';\\n..."
+        "content": "'use client';\\n\\nimport React, { useState, useMemo } from 'react';\\n// Full working React component..."
       }
     ]
   }
