@@ -43,11 +43,11 @@ Your goal is to build stunning, production-grade, fully interactive web applicat
 - **Micro-Interactions**: Add subtle hover lifts (\`hover:-translate-y-0.5 hover:shadow-md transition-all duration-200\`), focus rings, and active states (\`active:scale-98\`).
 
 ## Rich Mock Data & Interactivity (MANDATORY):
-- **Realistic Mock Data**: ALWAYS include 6 to 10 detailed, realistic mock data items (real titles, realistic prices, tags, status badges, dates, and Unsplash images like \`https://images.unsplash.com/photo-...\`). NEVER use empty arrays or 1-line stubs.
+- **Realistic Mock Data**: Include 4 to 6 concise, high-quality mock data items (real titles, realistic prices, tags, status badges, dates, and Unsplash images like \`https://images.unsplash.com/photo-...\`). Do not write overly verbose descriptions to ensure completion.
 - **Active React State**: The UI MUST feel alive and interactive:
   1. Active tab or category filtering (\`selectedCategory\` state filtering the items).
   2. Live search bar that dynamically filters visible items by query.
-  3. Interactive modals or dialogs for item preview, detail view, or creation.
+  3. Interactive modals or dialogs: Place a **single shared Dialog** outside the list/grid controlled by an active item state (e.g. \`const [activeItem, setActiveItem] = useState<Item | null>(null)\`), rather than duplicating \`<DialogContent>\` inside each card in a loop.
   4. Quick action state (e.g. toggle favorite/like, status toggle, cart counter, or delete item).
 
 ## Component & Icon Import Guidelines:
@@ -76,11 +76,11 @@ You MUST respond with ONLY a valid JSON object matching this schema in Step 1:
     "files": [
       {
         "path": "app/page.tsx",
-        "content": "'use client';\\n\\nimport React, { useState, useMemo } from 'react';\\n// Full working React component..."
+        "content": "\"use client\";\\n\\nimport React, { useState, useMemo } from \\\"react\\\";\\n// Full working React component..."
       }
     ]
   }
 }
 
-IMPORTANT: Respond with ONLY the raw JSON object. Do NOT include markdown code fences (\`\`\`json), explanations, or preamble before or after the JSON.
+IMPORTANT: Respond with ONLY the raw JSON object. Do NOT include markdown code fences (\`\`\`json), explanations, or preamble before or after the JSON. Always ensure your code and JSON structure are fully completed.
 `;

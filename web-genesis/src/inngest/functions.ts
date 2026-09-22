@@ -21,13 +21,11 @@ type ModelMessage = {
 };
 
 const DEFAULT_GROQ_MODELS = [
-  "groq/compound",
-  "groq/compound-mini",
   "openai/gpt-oss-120b",
   "openai/gpt-oss-20b",
   "qwen/qwen3.8-27b",
 ];
-const GROQ_MODELS = env.GROQ_MODEL
+const GROQ_MODELS = (env.GROQ_MODEL && !env.GROQ_MODEL.startsWith("groq/compound"))
   ? [
       env.GROQ_MODEL,
       ...DEFAULT_GROQ_MODELS.filter((model) => model !== env.GROQ_MODEL),
@@ -189,7 +187,7 @@ async function callLLMWithFallbacks(
   messages: ModelMessage[],
   options: { temperature?: number; max_tokens?: number } = {},
 ): Promise<string> {
-  const { temperature = 0.7, max_tokens = 4000 } = options;
+  const { temperature = 0.7, max_tokens = 8192 } = options;
   const failures: string[] = [];
 
 function parseGroqWaitMs(detail: string): number | null {
@@ -203,8 +201,8 @@ function parseGroqWaitMs(detail: string): number | null {
   for (const model of GROQ_MODELS) {
     try {
       const effectiveMaxTokens = model.includes("qwen")
-        ? Math.min(max_tokens, 1000)
-        : Math.min(max_tokens, 4096);
+        ? Math.min(max_tokens, 4096)
+        : Math.min(max_tokens, 8192);
 
       const response = await groq.chat.completions.create({
         model,
@@ -229,7 +227,7 @@ function parseGroqWaitMs(detail: string): number | null {
             model,
             messages,
             temperature,
-            max_tokens: model.includes("qwen") ? Math.min(max_tokens, 1000) : Math.min(max_tokens, 4096),
+            max_tokens: model.includes("qwen") ? Math.min(max_tokens, 4096) : Math.min(max_tokens, 8192),
           });
           return retryResponse.choices[0].message.content || "";
         } catch (retryErr) {
@@ -372,6 +370,51 @@ function getJSONCandidates(rawText: string) {
   return [...new Set(candidates)];
 }
 
+function extractContentFromJsonLike(rawText: string): ToolCall | null {
+  const contentKeyMatch = rawText.match(/"content"\s*:\s*"/);
+  if (!contentKeyMatch || contentKeyMatch.index === undefined) return null;
+
+  const afterQuote = rawText.slice(contentKeyMatch.index + contentKeyMatch[0].length);
+  let inEscape = false;
+  let endIdx = -1;
+  for (let i = 0; i < afterQuote.length; i++) {
+    const ch = afterQuote[i];
+    if (inEscape) {
+      inEscape = false;
+      continue;
+    }
+    if (ch === "\\") {
+      inEscape = true;
+      continue;
+    }
+    if (ch === '"') {
+      endIdx = i;
+      break;
+    }
+  }
+
+  let rawVal = endIdx >= 0 ? afterQuote.slice(0, endIdx) : afterQuote;
+  rawVal = rawVal.replace(/\\?"\s*\}?\s*\]?\s*\}?\s*$/, "");
+
+  const cleaned = autoFixJsxCode(rawVal);
+  if (
+    cleaned.includes("export default") ||
+    cleaned.includes("function") ||
+    cleaned.includes("<div") ||
+    cleaned.includes("<main")
+  ) {
+    console.log("[Parser] Successfully extracted and unescaped content from truncated/raw JSON");
+    return {
+      tool: "createOrUpdateFiles",
+      args: {
+        files: [{ path: "app/page.tsx", content: cleaned }],
+      },
+    };
+  }
+
+  return null;
+}
+
 function extractToolCallFromMarkdown(rawText: string): ToolCall | null {
   // 1. Check if any markdown code block contains a valid JSON tool call
   const jsonBlocks = [...rawText.matchAll(/```(?:json)?\s*(\{[\s\S]*?\})\s*```/gi)];
@@ -385,7 +428,11 @@ function extractToolCallFromMarkdown(rawText: string): ToolCall | null {
     }
   }
 
-  // 2. Extract code blocks (tsx, jsx, typescript, javascript, or untagged)
+  // 2. Try extracting content from raw/truncated JSON format
+  const jsonLike = extractContentFromJsonLike(rawText);
+  if (jsonLike) return jsonLike;
+
+  // 3. Extract code blocks (tsx, jsx, typescript, javascript, or untagged)
   const codeBlockRegex = /```(?:tsx|jsx|typescript|javascript|react)?\s*([\s\S]*?)```/gi;
   const blocks = [...rawText.matchAll(codeBlockRegex)];
 
@@ -456,7 +503,7 @@ function extractToolCallFromMarkdown(rawText: string): ToolCall | null {
     };
   }
 
-  // 3. Fallback: Detect raw TSX in unfenced text
+  // 4. Fallback: Detect raw TSX in unfenced text
   const hasReactSigns =
     (rawText.includes("export default function") || rawText.includes("export default")) &&
     (rawText.includes("<div") || rawText.includes("<main") || rawText.includes("return ("));
@@ -509,7 +556,7 @@ function parseToolCall(rawText: string): ToolCall | null {
     }
   }
 
-  // Fallback: extract code blocks from conversational markdown response
+  // Fallback: extract code blocks or unescape raw/truncated JSON content
   const extractedFromMarkdown = extractToolCallFromMarkdown(rawText);
   if (extractedFromMarkdown) {
     return extractedFromMarkdown;
@@ -568,10 +615,15 @@ function buildExistingFilesContext(files: { path: string; content: string }[]) {
   if (!files.length) return "";
 
   const sections = files.map((file) => {
-    const trimmed =
-      file.content.length > MAX_CONTEXT_FILE_CHARS
-        ? `${file.content.slice(0, MAX_CONTEXT_FILE_CHARS)}\n/* truncated */`
+    const sanitized =
+      file.path.endsWith(".tsx") || file.path.endsWith(".jsx")
+        ? autoFixJsxCode(file.content)
         : file.content;
+
+    const trimmed =
+      sanitized.length > MAX_CONTEXT_FILE_CHARS
+        ? `${sanitized.slice(0, MAX_CONTEXT_FILE_CHARS)}\n/* truncated */`
+        : sanitized;
 
     return `FILE: ${file.path}\n${trimmed}`;
   });
@@ -652,10 +704,10 @@ function autoFixJsxCode(content: string): string {
 
   let code = content.trim();
 
-  // 1. Strip leading/trailing escaped or unescaped quotes if the whole content was wrapped
+  // 1. Strip leading/trailing escaped or unescaped quotes if wrapped
   if (
-    (code.startsWith('"') && code.endsWith('"')) ||
-    (code.startsWith("'") && code.endsWith("'"))
+    (code.startsWith('"') && code.endsWith('"') && !code.startsWith('"use client"')) ||
+    (code.startsWith("'") && code.endsWith("'") && !code.startsWith("'use client'"))
   ) {
     try {
       code = JSON.parse(code);
@@ -666,25 +718,72 @@ function autoFixJsxCode(content: string): string {
     code = code.slice(2, -2);
   }
 
-  // 2. Unescape double-escaped characters from LLM JSON responses:
-  // \" -> ", \n -> newline, \t -> tab, \r -> return
-  if (code.includes('\\"') || code.includes("\\n") || code.includes("\\t") || code.includes("\\r")) {
+  // 2. Multi-pass unescape double/triple escaped JSON sequences
+  let iterations = 0;
+  while (
+    (code.includes('\\"') || code.includes("\\n") || code.includes("\\t") || code.includes("\\'")) &&
+    iterations < 3
+  ) {
     code = code
-      .replace(/\\"/g, '"')
       .replace(/\\n/g, "\n")
+      .replace(/\\r/g, "\r")
       .replace(/\\t/g, "\t")
-      .replace(/\\r/g, "\r");
+      .replace(/\\"/g, '"')
+      .replace(/\\'/g, "'");
+    iterations++;
   }
 
-  // 3. Clean up any remaining literal backslash-escaped quotes (e.g. from \"react\" or className=\"...\")
-  code = code.replace(/\\"/g, '"');
+  // Unescape any leftover backslash before quotes (e.g. from \"react\")
+  code = code.replace(/\\"/g, '"').replace(/\\'/g, "'");
 
-  // 4. Strip accidental markdown code fences if wrapped inside the content string
+  // 3. Strip accidental markdown code fences
   code = code.replace(/^```(?:tsx|jsx|typescript|javascript|react)?\s*/i, "");
   code = code.replace(/\s*```$/i, "");
 
-  // 5. Fix unclosed JSX comments like {/* comment */ without closing }
+  // 4. Ensure "use client"; is on the very first line
+  if (!code.includes('"use client"') && !code.includes("'use client'")) {
+    code = `"use client";\n\n${code}`;
+  } else if (!code.startsWith('"use client"') && !code.startsWith("'use client'")) {
+    code = code.replace(/^[\s\S]*?(["']use client["'];?)/, '$1');
+  }
+
+  // 5. Fix unclosed JSX comments
   code = code.replace(/(\{\/\*[\s\S]*?\*\/)(?!\})/g, "$1}");
+
+  // 6. Handle truncated trailing tag if LLM cut off
+  const lastLt = code.lastIndexOf("<");
+  if (lastLt > 0) {
+    const afterLt = code.slice(lastLt);
+    if (!afterLt.replace(/=>/g, "").includes(">")) {
+      code = code.slice(0, lastLt).trimEnd();
+    }
+  }
+
+  // 7. Balance unclosed braces if truncated
+  let openBraces = 0;
+  let inString: string | null = null;
+  for (let i = 0; i < code.length; i++) {
+    const ch = code[i];
+    if (inString) {
+      if (ch === inString && code[i - 1] !== "\\") {
+        inString = null;
+      }
+      continue;
+    }
+    if (ch === '"' || ch === "'" || ch === '`') {
+      inString = ch;
+      continue;
+    }
+    if (ch === "{") openBraces++;
+    else if (ch === "}") openBraces = Math.max(0, openBraces - 1);
+  }
+
+  if (openBraces > 0) {
+    while (openBraces > 0) {
+      code += "\n}";
+      openBraces--;
+    }
+  }
 
   return code.trim();
 }
@@ -942,7 +1041,7 @@ export const codeAgentFunction = inngest.createFunction(
         try {
           raw = await callLLMWithFallbacks(agentMessages, {
             temperature: 0.35,
-            max_tokens: 4096,
+            max_tokens: 8192,
           });
         } catch (error: unknown) {
           if (isRateLimitError(error)) {
@@ -983,7 +1082,7 @@ export const codeAgentFunction = inngest.createFunction(
           try {
             const raw2 = await callLLMWithFallbacks(agentMessages, {
               temperature: 0.65,
-              max_tokens: 4096,
+              max_tokens: 8192,
             });
             const parsed2 = parseToolCall(raw2);
             if (parsed2 && parsed2.tool === "createOrUpdateFiles") {
@@ -1084,7 +1183,10 @@ export const codeAgentFunction = inngest.createFunction(
       for (const filePath of updatedFiles) {
         try {
           const content = await sandboxInstance.files.read(filePath);
-          filesWithContent[filePath] = content;
+          filesWithContent[filePath] =
+            filePath.endsWith(".tsx") || filePath.endsWith(".jsx")
+              ? autoFixJsxCode(content)
+              : content;
         } catch (error) {
           console.error(`Failed to read file ${filePath}:`, error);
           filesWithContent[filePath] = "// Error reading file content";
