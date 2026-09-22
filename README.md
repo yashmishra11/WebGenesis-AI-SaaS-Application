@@ -1,113 +1,139 @@
-# WebGenesis-AI-SaaS-Application
+# WebGenesis — AI SaaS Application
 
-WebGenesis is an innovative AI-powered Software-as-a-Service (SaaS) platform designed to help businesses and developers streamline the creation, deployment, and management of intelligent web applications. Built on modern cloud architecture, WebGenesis provides scalable AI tools and APIs for automation.
+WebGenesis is an AI-powered SaaS platform designed to generate, preview, and iterate on production-grade Next.js web applications directly in real-time cloud sandboxes. From natural language prompts to live interactive apps, WebGenesis streamlines the entire full-stack prototyping and development lifecycle.
+
+---
 
 ## Features
 
-- **AI-Powered Development**: Leverage advanced AI models to automate web application development
-- **Intelligent Deployment**: Smart deployment pipelines with automated optimization
-- **Scalable Architecture**: Built on modern cloud infrastructure for enterprise-grade scalability
-- **Developer-Friendly APIs**: Comprehensive API suite for seamless integration
-- **Real-time Management**: Monitor and manage your applications in real-time
-- **Automated Workflows**: Streamline your development process with intelligent automation
+- **Prompt-to-App Generation**: Create full, responsive Next.js App Router applications with modern UI/UX from plain English prompts.
+- **Live Interactive Sandbox**: Instant browser preview powered by E2B cloud containers running a live Next.js development server.
+- **Iterative Refinement**: Chat-based modifications with incremental code updates preserving context.
+- **Design Variations**: One-click regeneration with alternative color palettes, layout alignments, and typography hierarchy.
+- **Multi-Model AI Routing**: Primary high-speed generation via Groq (`openai/gpt-oss-120b`, `openai/gpt-oss-20b`, `qwen/qwen3.8-27b`) with automatic fallbacks to OpenRouter, Gemini, and OpenAI.
+- **Robust Code Sanitization**: Built-in multi-pass unescaping and JSX balancing engine ensuring valid syntax across Turbopack builds.
+- **Asynchronous Agent Orchestration**: Background execution pipeline powered by Inngest.
+- **Modern UI & Dark Mode**: Sleek SaaS interface with Tailwind CSS and Radix UI components.
+
+---
 
 ## Screenshots
 
 ### Homepage
 ![Homepage](./images/homepage.jpeg)
-*WebGenesis landing page and main interface*
+*WebGenesis landing page and prompt builder*
 
-### Output
+### Live Preview Output
 ![Output](./images/output)
-*AI-generated results and application output*
+*Interactive application preview with side-by-side code inspection*
 
-### Workflow
+### Workflow Architecture
 ![Working Flowchart](./images/working_flowchart.png)
-*Complete workflow architecture and process flow*
-
-## Tech Stack
-
-- **Frontend**: [Your frontend framework]
-- **Backend**: [Your backend technology]
-- **AI/ML**: [AI frameworks used]
-- **Database**: [Database technology]
-- **Cloud**: [Cloud platform]
-- **APIs**: RESTful/GraphQL
-
-## Installation
-
-```bash
-# Clone the repository
-git clone https://github.com/yashmishra11/WebGenesis-AI-SaaS-Application.git
-
-# Navigate to the project directory
-cd WebGenesis-AI-SaaS-Application
-
-# Install dependencies
-npm install
-
-# Set up environment variables
-cp .env.example .env
-
-# Run the application
-npm start
-```
-
-## Configuration
-
-Create a `.env` file in the root directory with the following variables:
-
-```env
-GROQ_API_KEY=
-E2B_API_KEY=e2b_db3fb7c34f6f1f5aad88ec88a7d87a4dd45f247d
-DATABASE_URL='postgresql://neondb_owner:npg_pvH8BQcD5GhT@ep-jolly-grass-ad1aedu0-pooler.c-2.us-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require'
-```
-
-## Usage
-
-```javascript
-// Example usage of WebGenesis API
-import { WebGenesis } from 'webgenesis-sdk';
-
-const app = new WebGenesis({
-  apiKey: 'your-api-key'
-});
-
-// Create a new AI-powered application
-await app.create({
-  name: 'My App',
-  features: ['ai-chat', 'automation']
-});
-```
-
-## Key Benefits
-
-- **Faster Time to Market**: Deploy intelligent applications in minutes, not months
-- **Cost-Effective**: Reduce development costs with AI automation
-- **Scalable Solutions**: Grow from startup to enterprise with ease
-- **Developer Experience**: Intuitive tools designed for modern development workflows
-
-## Contributing
-
-Contributions are welcome! Please follow these steps:
-
-1. Fork the repository
-2. Create a new branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add some amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
-## License
-
-This project is licensed under the [JAAFR](LICENSE)
-
-## Team
-
-- **Yash** - [@yashmishra11](https://github.com/yashmishra11)
-- **Shan** - [@Mohdshan09](https://github.com/Mohdshan09)
-- **Prajjval** - [@prajjval9579](https://github.com/prajjval9579)
+*Execution flowchart across Next.js, Inngest agents, LLM providers, and E2B sandboxes*
 
 ---
 
-** If you find this project useful, please consider giving it a star!**
-(https://webgenesis09.vercel.app)
+## Tech Stack
+
+- **Framework**: [Next.js 15](https://nextjs.org/) (App Router, Turbopack, React 19)
+- **Styling**: [Tailwind CSS](https://tailwindcss.com/), [Shadcn UI](https://ui.shadcn.com/) / Radix UI, Lucide Icons
+- **Sandboxed Execution**: [E2B Code Interpreter](https://e2b.dev/) Cloud Sandbox
+- **AI Providers**: [Groq SDK](https://groq.com/) (`openai/gpt-oss-120b`, `openai/gpt-oss-20b`, `qwen/qwen3.8-27b`), Google Gemini, OpenAI, OpenRouter
+- **Background Jobs**: [Inngest](https://www.inngest.com/)
+- **API Layer**: [tRPC v11](https://trpc.io/)
+- **Authentication**: [Clerk](https://clerk.com/)
+- **Database & ORM**: PostgreSQL ([Neon Serverless](https://neon.tech/)) with [Prisma ORM](https://www.prisma.io/)
+
+---
+
+## Getting Started
+
+### Prerequisites
+- Node.js 18.x or higher
+- PostgreSQL database (or Neon account)
+- Groq API Key
+- E2B API Key
+- Clerk account for authentication
+
+### Installation
+
+1. **Clone the repository**:
+   ```bash
+   git clone https://github.com/yashmishra11/WebGenesis-AI-SaaS-Application.git
+   cd WebGenesis-AI-SaaS-Application/web-genesis
+   ```
+
+2. **Install dependencies**:
+   ```bash
+   npm install
+   ```
+
+3. **Configure Environment Variables**:
+   Copy the example environment file:
+   ```bash
+   cp .env.example .env
+   ```
+   Fill in your configuration:
+   ```env
+   # Application
+   NEXT_PUBLIC_APP_URL=http://localhost:3000
+   NODE_ENV=development
+
+   # Database (PostgreSQL / Neon)
+   DATABASE_URL="postgresql://user:password@ep-sample-pooler.us-east-1.aws.neon.tech/neondb?sslmode=require"
+
+   # Clerk Authentication
+   NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_...
+   CLERK_SECRET_KEY=sk_test_...
+   NEXT_PUBLIC_CLERK_SIGN_IN_URL=/sign-in
+   NEXT_PUBLIC_CLERK_SIGN_UP_URL=/sign-up
+   NEXT_PUBLIC_CLERK_SIGN_IN_FALLBACK_REDIRECT_URL=/
+   NEXT_PUBLIC_CLERK_SIGN_UP_FALLBACK_REDIRECT_URL=/
+
+   # Inngest Background Jobs
+   INNGEST_EVENT_KEY=
+   INNGEST_SIGNING_KEY=
+   INNGEST_DEV=true
+
+   # AI Providers
+   GROQ_API_KEY=gsk_...
+   GROQ_MODEL=openai/gpt-oss-120b
+
+   # E2B Sandbox Runtime
+   E2B_API_KEY=e2b_...
+   ```
+
+4. **Initialize Database**:
+   ```bash
+   npx prisma migrate deploy
+   npx prisma generate
+   ```
+
+5. **Start Inngest Dev Server** (in a separate terminal):
+   ```bash
+   npm run inngest
+   ```
+
+6. **Start Application Dev Server**:
+   ```bash
+   npm run dev
+   ```
+
+Open [http://localhost:3000](http://localhost:3000) to view WebGenesis.
+
+---
+
+## Team
+
+- **Yash** — [@yashmishra11](https://github.com/yashmishra11)
+- **Shan** — [@Mohdshan09](https://github.com/Mohdshan09)
+- **Prajjval** — [@prajjval9579](https://github.com/prajjval9579)
+
+---
+
+## License
+
+This project is licensed under the [MIT License](LICENSE).
+
+⭐️ If you find WebGenesis useful, please consider giving it a star on GitHub!
+[Live Demo](https://webgenesis09.vercel.app)
